@@ -66,8 +66,8 @@
     .stats, .leaderboard, .feed, .history { display: grid; gap: 10px; margin-top: 14px; }
     .mini { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 11px; border-radius: 8px; background: rgba(255,255,255,.04); }
     .board-wrap { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.04); }
-    .board { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); overflow: hidden; border-radius: 8px; }
-    .sq { position: relative; display: grid; place-items: center; border: 0; padding: 0; font-size: clamp(24px, 5.6vw, 54px); }
+    .board { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); overflow: hidden; border-radius: 8px; }
+    .sq { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; aspect-ratio: 1; border: 0; padding: 0; line-height: 1; appearance: none; font-size: clamp(24px, 5.6vw, 54px); }
     .sq.light { background: var(--light); color: #111; }
     .sq.dark { background: var(--dark); color: #111; }
     .sq.selected::after, .sq.last::after, .sq.check::after { content: ""; position: absolute; inset: 5px; border-radius: 6px; background: rgba(255,255,255,.26); }
