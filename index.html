@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ChessPulse</title>
+    <meta name="theme-color" content="#0f141f" />
     <meta
       name="description"
       content="ChessPulse — современная веб-платформа для шахмат с AI Coach, историей партий, городским лидербордом и красивым адаптивным интерфейсом."
@@ -15,6 +16,7 @@
       rel="stylesheet"
     />
     <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css?v=2" />
   </head>
   <body data-theme="aurora">
@@ -87,6 +89,16 @@
             </label>
 
             <label class="field">
+              <span>Контроль времени</span>
+              <select id="time-control-select">
+                <option value="rapid">10+5 rapid</option>
+                <option value="blitz">5+0 blitz</option>
+                <option value="classic">15+10 classic</option>
+                <option value="untimed">Без часов</option>
+              </select>
+            </label>
+
+            <label class="field">
               <span>Тема интерфейса</span>
               <select id="theme-select">
                 <option value="aurora">Aurora</option>
@@ -145,6 +157,7 @@
 
             <div class="inline-actions">
               <button class="button button--ghost" id="flip-btn" type="button">Перевернуть</button>
+              <button class="button button--ghost" id="hint-btn" type="button">Подсказка</button>
               <button class="button button--ghost" id="undo-btn" type="button">Отменить</button>
               <button class="button button--ghost" id="reset-btn" type="button">Сбросить</button>
             </div>
@@ -158,6 +171,17 @@
                   <span id="status-subtitle">Выбери фигуру, чтобы увидеть доступные ходы.</span>
                 </div>
                 <span class="badge" id="match-badge">Opening</span>
+              </div>
+
+              <div class="clock-row" aria-label="Игровые часы">
+                <article class="clock-card" id="clock-white-card">
+                  <span>White</span>
+                  <strong id="clock-white">10:00</strong>
+                </article>
+                <article class="clock-card" id="clock-black-card">
+                  <span>Black</span>
+                  <strong id="clock-black">10:00</strong>
+                </article>
               </div>
 
               <div class="board-shell">
@@ -174,6 +198,35 @@
                 <p class="move-column__copy" id="momentum-copy">
                   Сильные ходы повышают точность и рейтинг в городском ладдере.
                 </p>
+              </article>
+
+              <article class="mini-card review-card">
+                <div class="mini-card__top">
+                  <p class="panel-label">Review Lab</p>
+                  <span class="badge badge--soft" id="eval-badge">+0.0</span>
+                </div>
+                <div class="review-grid">
+                  <div>
+                    <span>Дебют</span>
+                    <strong id="opening-name">Start position</strong>
+                  </div>
+                  <div>
+                    <span>Материал</span>
+                    <strong id="material-balance">0.0</strong>
+                  </div>
+                  <div>
+                    <span>Форсинг</span>
+                    <strong id="threat-meter">0 ideas</strong>
+                  </div>
+                  <div>
+                    <span>Clock pressure</span>
+                    <strong id="clock-pressure">Low</strong>
+                  </div>
+                </div>
+                <div class="tool-row">
+                  <button class="button button--secondary" id="copy-fen-btn" type="button">Copy FEN</button>
+                  <button class="button button--secondary" id="copy-pgn-btn" type="button">Copy PGN</button>
+                </div>
               </article>
 
               <article class="mini-card">

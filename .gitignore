@@ -1,6 +1,8 @@
 .DS_Store
+.netlify/
 submission/
 chesspulse-*.png
+*-check.png
 ChessPulse-submission.zip
 deploy/
 *.log

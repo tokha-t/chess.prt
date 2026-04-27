@@ -2,14 +2,20 @@
 
 **ChessPulse** is a modern chess web app designed as a product prototype, not just a board demo.
 
+Live demo: [https://chesspulse-great.netlify.app/](https://chesspulse-great.netlify.app/)
+
 It combines:
 
 - legal chess gameplay with full move validation
 - a built-in AI opponent
 - an **AI Coach** that evaluates your decisions after each move
+- timed games with `5+0`, `10+5`, `15+10`, and untimed modes
+- drag-and-drop moves, click-to-move, hints, and keyboard shortcuts
+- Review Lab with opening detection, material balance, forcing-move pressure, FEN, and PGN export
 - persistent match history in `localStorage`
 - a city-based leaderboard for a stronger social loop
 - a premium-ready product layer with monetization cues
+- PWA metadata and service worker caching for an installable, offline-friendly feel
 - a responsive interface that works well on desktop and mobile
 
 ## Product Idea
@@ -37,6 +43,18 @@ That makes the project feel closer to a startup MVP than a coding exercise.
   - classifies moves
   - estimates evaluation loss
   - suggests a better continuation when available
+- **Review Lab**
+  - shows the detected opening line
+  - tracks material balance from the player perspective
+  - surfaces forcing-move pressure
+  - exports FEN and PGN for review
+- **Game clocks**
+  - supports blitz, rapid, classic, and untimed play
+  - flag-fall result is saved into history
+- **Input polish**
+  - click-to-move
+  - drag-and-drop pieces
+  - hotkeys: `N` new game, `U` undo, `F` flip, `H` hint, `C` copy FEN, `P` copy PGN
 - **Persistent profile**
   - player name
   - city
@@ -69,9 +87,10 @@ This project intentionally goes beyond the “medium” level from the assignmen
 - HTML
 - CSS
 - Vanilla JavaScript
-- local `chess.js` vendor build
-- custom minimax-based AI and move evaluation
+- `chess.js` rule engine (local vendor build for offline local runs, ESM import-compatible for static hosting)
+- custom minimax-based AI with alpha-beta pruning, move ordering, and a transposition cache
 - `localStorage` for persistence
+- service worker + web manifest for PWA readiness
 
 ## Run Locally
 
@@ -110,6 +129,8 @@ For the assignment, Netlify Drop is usually the fastest option if time is tight.
 - [styles.css](/Users/lost_home/Documents/wool/styles.css)
 - [app.js](/Users/lost_home/Documents/wool/app.js)
 - [vendor/chess.js](/Users/lost_home/Documents/wool/vendor/chess.js)
+- [manifest.webmanifest](/Users/lost_home/Documents/wool/manifest.webmanifest)
+- [sw.js](/Users/lost_home/Documents/wool/sw.js)
 
 ## What I Would Build Next
 
