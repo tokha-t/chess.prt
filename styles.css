@@ -460,6 +460,7 @@ button {
   aspect-ratio: 1;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
   overflow: hidden;
   border-radius: 22px;
   box-shadow:
@@ -469,12 +470,18 @@ button {
 
 .square {
   position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
   border: 0;
   padding: 0;
   display: grid;
   place-items: center;
+  aspect-ratio: 1;
+  line-height: 1;
   overflow: hidden;
   background: transparent;
+  appearance: none;
 }
 
 .square--light {
