@@ -2,7 +2,7 @@
 
 ChessMentor AI is a modern web-based chess learning platform for beginners, students, and casual players. It combines a legal chess board, AI opponents, saved game history, progress tracking, daily missions, game reports, and simple post-game coaching in one product-like MVP.
 
-Live demo: https://chesspulse-great.netlify.app/
+Live demo: https://chessmentor-ai.netlify.app
 
 ## Product Idea
 
