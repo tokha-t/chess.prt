@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { selectAiMove } from "../lib/aiPlayer.js";
 import { analyzeGame } from "../lib/gameAnalysis.js";
 import {
+  capitalize,
   createGame,
   findKingSquare,
   getGameStatus,
@@ -16,13 +17,37 @@ import {
   serializeMove,
 } from "../lib/chessEngine.js";
 import { saveGame, updateUserStats } from "../lib/database.js";
+import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
+
+const TIME_CONTROLS = {
+  classic: { label: "Classic", minutes: 30, description: "30 min" },
+  rapid: { label: "Rapid", minutes: 10, description: "10 min" },
+  blitz: { label: "Blitz", minutes: 5, description: "5 min" },
+};
+
+function createRoomId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().slice(0, 8);
+  }
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function getInitialClocks(timeControl) {
+  const minutes = TIME_CONTROLS[timeControl]?.minutes ?? TIME_CONTROLS.rapid.minutes;
+  const time = minutes * 60 * 1000;
+  return { white: time, black: time };
+}
 
 export default function Play() {
   const { user } = useAuth();
   const gameRef = useRef(createGame());
   const aiRequestRef = useRef(0);
   const aiPendingRef = useRef(false);
+  const channelRef = useRef(null);
+  const clientIdRef = useRef(createRoomId());
+  const lastClockTickRef = useRef(Date.now());
   const savedRef = useRef(false);
+  const timeoutHandledRef = useRef(false);
 
   const [fen, setFen] = useState(gameRef.current.fen());
   const [moves, setMoves] = useState([]);
@@ -30,6 +55,11 @@ export default function Play() {
   const [mode, setMode] = useState("ai");
   const [difficulty, setDifficulty] = useState("medium");
   const [playerColor, setPlayerColor] = useState("white");
+  const [timeControl, setTimeControl] = useState("rapid");
+  const [clocks, setClocks] = useState(() => getInitialClocks("rapid"));
+  const [clockStarted, setClockStarted] = useState(false);
+  const [roomId, setRoomId] = useState(() => localStorage.getItem("chessmentor-room-id") || createRoomId());
+  const [onlineStatus, setOnlineStatus] = useState("offline");
   const [thinking, setThinking] = useState(false);
   const [message, setMessage] = useState("");
   const [selectedSquare, setSelectedSquare] = useState(null);
@@ -38,7 +68,8 @@ export default function Play() {
   const [review, setReview] = useState(null);
   const [savedGame, setSavedGame] = useState(null);
 
-  const orientation = mode === "ai" ? playerColor : "white";
+  const orientation = mode === "ai" || mode === "online" ? playerColor : "white";
+  const activeClockColor = gameRef.current.turn() === "w" ? "white" : "black";
 
   function syncGame(nextMessage = "") {
     const nextHistory = gameRef.current.history({ verbose: true }).map(serializeMove);
@@ -52,27 +83,52 @@ export default function Play() {
 
   function isHumanTurn() {
     if (mode === "local") return true;
+    if (mode === "online") return (gameRef.current.turn() === "w" ? "white" : "black") === playerColor;
     return (gameRef.current.turn() === "w" ? "white" : "black") === playerColor;
   }
 
-  function resetGame() {
+  function sendOnlineEvent(event, payload = {}) {
+    if (mode !== "online" || !channelRef.current || onlineStatus !== "connected") return;
+    channelRef.current.send({
+      type: "broadcast",
+      event,
+      payload: {
+        ...payload,
+        senderId: clientIdRef.current,
+      },
+    });
+  }
+
+  function resetGame({ broadcast = true, nextTimeControl = timeControl } = {}) {
     gameRef.current = createGame();
     savedRef.current = false;
+    timeoutHandledRef.current = false;
     setSelectedSquare(null);
     setLegalTargets([]);
     setLastMove(null);
     setReview(null);
     setSavedGame(null);
+    setClocks(getInitialClocks(nextTimeControl));
+    setClockStarted(false);
+    lastClockTickRef.current = Date.now();
     aiPendingRef.current = false;
     setThinking(false);
     syncGame(mode === "ai" && playerColor === "black" ? "AI will make the first move." : "New game started.");
+
+    if (broadcast) {
+      sendOnlineEvent("new-game", {
+        fen: gameRef.current.fen(),
+        timeControl: nextTimeControl,
+        clocks: getInitialClocks(nextTimeControl),
+      });
+    }
   }
 
   function finishGame(nextStatus, nextHistory, resignedColor = null) {
     if (savedRef.current) return;
     savedRef.current = true;
 
-    const userColor = mode === "ai" ? playerColor : "white";
+    const userColor = mode === "ai" || mode === "online" ? playerColor : "white";
     const result = getUserResult(nextStatus, userColor, resignedColor);
     const nextReview = analyzeGame({ history: nextHistory, status: nextStatus, playerColor: userColor });
     setReview({ ...nextReview, result });
@@ -84,7 +140,7 @@ export default function Play() {
 
     saveGame({
       user_id: user.id,
-      opponent_type: mode === "ai" ? `ai_${difficulty}` : "local",
+      opponent_type: mode === "ai" ? `ai_${difficulty}_${timeControl}` : `${mode}_${timeControl}`,
       user_color: userColor,
       result,
       final_fen: gameRef.current.fen(),
@@ -103,6 +159,27 @@ export default function Play() {
       });
   }
 
+  function finishByTimeout(loserColor, remote = false) {
+    if (timeoutHandledRef.current || status.isGameOver) return;
+    timeoutHandledRef.current = true;
+    const winner = loserColor === "white" ? "black" : "white";
+    const timeoutStatus = {
+      ...getGameStatus(gameRef.current),
+      label: "Time out",
+      message: `${capitalize(loserColor)} lost on time`,
+      turnColor: loserColor,
+      isCheck: false,
+      isGameOver: true,
+      winner,
+      result: "timeout",
+    };
+    const nextHistory = gameRef.current.history({ verbose: true }).map(serializeMove);
+    setStatus(timeoutStatus);
+    setClockStarted(false);
+    finishGame(timeoutStatus, nextHistory);
+    if (!remote) sendOnlineEvent("timeout", { loserColor, clocks });
+  }
+
   function makeMove(from, to) {
     if (status.isGameOver || thinking || !isHumanTurn()) return false;
 
@@ -115,8 +192,15 @@ export default function Play() {
       setSelectedSquare(null);
       setLegalTargets([]);
       setLastMove({ from: move.from, to: move.to });
+      setClockStarted(true);
       const { nextHistory, nextStatus } = syncGame("");
       if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
+      sendOnlineEvent("move", {
+        fen: gameRef.current.fen(),
+        lastMove: { from: move.from, to: move.to },
+        clocks,
+        timeControl,
+      });
       return true;
     } catch {
       setMessage("Illegal move. ChessMentor only allows legal chess moves.");
@@ -151,7 +235,7 @@ export default function Play() {
   }
 
   function handleUndo() {
-    if (thinking || status.isGameOver) return;
+    if (thinking || status.isGameOver || mode === "online") return;
     gameRef.current.undo();
     if (mode === "ai" && gameRef.current.history().length) {
       gameRef.current.undo();
@@ -169,7 +253,8 @@ export default function Play() {
     if (status.isGameOver || thinking) return;
     const confirmed = window.confirm("Resign this game?");
     if (!confirmed) return;
-    const resignedColor = gameRef.current.turn() === "w" ? "white" : "black";
+    const resignedColor =
+      mode === "ai" || mode === "online" ? playerColor : gameRef.current.turn() === "w" ? "white" : "black";
     const nextStatus = {
       ...status,
       label: "Resigned",
@@ -180,16 +265,28 @@ export default function Play() {
     };
     setStatus(nextStatus);
     finishGame(nextStatus, moves, resignedColor);
+    sendOnlineEvent("resign", { resignedColor, clocks });
   }
 
   function handleModeChange(nextMode) {
     setMode(nextMode);
-    setTimeout(resetGame, 0);
+    setTimeout(() => resetGame({ broadcast: false }), 0);
   }
 
   function handlePlayerColorChange(nextColor) {
     setPlayerColor(nextColor);
-    setTimeout(resetGame, 0);
+    setTimeout(() => resetGame({ broadcast: false }), 0);
+  }
+
+  function handleTimeControlChange(nextTimeControl) {
+    setTimeControl(nextTimeControl);
+    setTimeout(() => resetGame({ nextTimeControl }), 0);
+  }
+
+  function handleRoomIdChange(nextRoomId) {
+    const sanitized = nextRoomId.trim().slice(0, 32);
+    setRoomId(sanitized);
+    localStorage.setItem("chessmentor-room-id", sanitized);
   }
 
   useEffect(() => {
@@ -213,6 +310,7 @@ export default function Play() {
       if (aiMove) {
         const move = gameRef.current.move({ from: aiMove.from, to: aiMove.to, promotion: aiMove.promotion || "q" });
         setLastMove({ from: move.from, to: move.to });
+        setClockStarted(true);
         const { nextHistory, nextStatus } = syncGame("");
         if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
       }
@@ -228,6 +326,114 @@ export default function Play() {
       }
     };
   }, [difficulty, fen, mode, playerColor, status.isGameOver]);
+
+  useEffect(() => {
+    if (mode !== "online") {
+      setOnlineStatus("offline");
+      return undefined;
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      setOnlineStatus("Supabase env missing");
+      setMessage("Online rooms need Supabase env variables because they use Supabase Realtime WebSockets.");
+      return undefined;
+    }
+
+    if (!roomId) {
+      setOnlineStatus("Add room code");
+      return undefined;
+    }
+
+    setOnlineStatus("connecting");
+    const channel = supabase.channel(`chessmentor:${roomId}`, {
+      config: { broadcast: { self: false } },
+    });
+    channelRef.current = channel;
+
+    channel
+      .on("broadcast", { event: "move" }, ({ payload }) => {
+        if (payload?.senderId === clientIdRef.current) return;
+        try {
+          gameRef.current.load(payload.fen);
+          setLastMove(payload.lastMove ?? null);
+          if (payload.clocks) setClocks(payload.clocks);
+          if (payload.timeControl) setTimeControl(payload.timeControl);
+          setClockStarted(true);
+          const { nextHistory, nextStatus } = syncGame("Opponent moved through WebSocket room.");
+          if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
+        } catch {
+          setMessage("Could not apply remote move. Ask your opponent to start a new room game.");
+        }
+      })
+      .on("broadcast", { event: "new-game" }, ({ payload }) => {
+        if (payload?.senderId === clientIdRef.current) return;
+        if (payload?.timeControl) setTimeControl(payload.timeControl);
+        if (payload?.clocks) setClocks(payload.clocks);
+        gameRef.current = createGame();
+        if (payload?.fen) gameRef.current.load(payload.fen);
+        savedRef.current = false;
+        timeoutHandledRef.current = false;
+        setClockStarted(false);
+        setSelectedSquare(null);
+        setLegalTargets([]);
+        setLastMove(null);
+        setReview(null);
+        setSavedGame(null);
+        syncGame("Opponent started a new WebSocket room game.");
+      })
+      .on("broadcast", { event: "resign" }, ({ payload }) => {
+        if (payload?.senderId === clientIdRef.current) return;
+        const resignedColor = payload?.resignedColor;
+        if (!resignedColor) return;
+        const nextStatus = {
+          ...getGameStatus(gameRef.current),
+          label: "Resigned",
+          message: `${capitalize(resignedColor)} resigned`,
+          isGameOver: true,
+          winner: resignedColor === "white" ? "black" : "white",
+          result: "resigned",
+        };
+        setStatus(nextStatus);
+        finishGame(nextStatus, gameRef.current.history({ verbose: true }).map(serializeMove), resignedColor);
+      })
+      .on("broadcast", { event: "timeout" }, ({ payload }) => {
+        if (payload?.senderId === clientIdRef.current) return;
+        if (payload?.clocks) setClocks(payload.clocks);
+        if (payload?.loserColor) finishByTimeout(payload.loserColor, true);
+      })
+      .subscribe((nextStatus) => {
+        setOnlineStatus(nextStatus === "SUBSCRIBED" ? "connected" : nextStatus.toLowerCase());
+      });
+
+    return () => {
+      channelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [mode, roomId]);
+
+  useEffect(() => {
+    if (!clockStarted || status.isGameOver) {
+      lastClockTickRef.current = Date.now();
+      return undefined;
+    }
+
+    const interval = window.setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastClockTickRef.current;
+      lastClockTickRef.current = now;
+      const activeColor = gameRef.current.turn() === "w" ? "white" : "black";
+
+      setClocks((currentClocks) => {
+        const nextTime = Math.max(0, currentClocks[activeColor] - elapsed);
+        if (nextTime === 0) {
+          window.setTimeout(() => finishByTimeout(activeColor), 0);
+        }
+        return { ...currentClocks, [activeColor]: nextTime };
+      });
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [clockStarted, status.isGameOver]);
 
   const squareStyles = useMemo(() => {
     const styles = {};
@@ -292,13 +498,22 @@ export default function Play() {
             setDifficulty={setDifficulty}
             playerColor={playerColor}
             setPlayerColor={handlePlayerColorChange}
-            onNewGame={resetGame}
+            timeControl={timeControl}
+            setTimeControl={handleTimeControlChange}
+            timeControls={TIME_CONTROLS}
+            clocks={clocks}
+            activeClockColor={activeClockColor}
+            roomId={roomId}
+            setRoomId={handleRoomIdChange}
+            onlineStatus={onlineStatus}
+            onlineEnabled={isSupabaseConfigured}
+            onNewGame={() => resetGame()}
             onUndo={handleUndo}
             onResign={handleResign}
             disabled={thinking || moves.length === 0}
           />
           <MoveHistory moves={moves} />
-          <GameReview review={review} onPlayAgain={resetGame} />
+          <GameReview review={review} onPlayAgain={() => resetGame()} />
         </aside>
       </section>
     </main>

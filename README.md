@@ -22,6 +22,8 @@ ChessMentor AI turns each game into a learning experience by explaining mistakes
 - Local two-player mode
 - Play against AI
 - AI difficulty levels: Easy, Medium, Hard
+- Online room mode using Supabase Realtime WebSocket broadcasts
+- Time controls: Classic, Rapid, Blitz
 - User authentication with Supabase
 - Saved game history
 - Post-game review
@@ -37,6 +39,7 @@ ChessMentor AI turns each game into a learning experience by explaining mistakes
 - `chess.js`
 - `react-chessboard`
 - Supabase Auth and Database
+- Supabase Realtime for WebSocket-style online rooms
 - CSS modules via plain responsive CSS
 - Netlify-ready SPA build
 
@@ -57,7 +60,7 @@ Security:
 ChessMentor AI can start as a free learning platform for casual players, then expand into a Pro plan for advanced AI analysis, unlimited reviews, custom board skins, city tournaments, and school chess programs.
 
 ## Future improvements
-- Real-time multiplayer with WebSockets
+- Rated matchmaking and public invite links
 - Real Stockfish cloud analysis
 - Puzzle generation from user mistakes
 - School and university tournaments
@@ -102,9 +105,14 @@ Do not commit real Supabase keys. Without these variables, guest play still work
 4. Copy the project URL and anon public key into `.env`.
 5. Restart `npm run dev`.
 
+Realtime multiplayer:
+- The `/play` page includes an Online Room mode powered by Supabase Realtime broadcasts.
+- Players use the same room code and choose opposite sides.
+- No extra table is required for the live room because moves are sent over the Realtime WebSocket channel.
+
 ## Product flow
 1. Visit `/` to understand the product value.
-2. Go to `/play` to play locally or against AI.
+2. Go to `/play` to play locally, against AI, or in an Online Room.
 3. Sign up or log in to save finished games.
 4. Open `/history` to review saved games.
 5. Use `/dashboard` to track progress and skills.
