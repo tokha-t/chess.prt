@@ -132,14 +132,40 @@ export default function Play() {
     setMessage(`${evaluation.label}: ${evaluation.explanation}`);
   }
 
+  function shouldEvaluateMove(move) {
+    if (mode !== "ai") return false;
+    const moveColor = move.color === "w" ? "white" : "black";
+    return moveColor === playerColor;
+  }
+
   function evaluateMadeMove(beforeFen, move) {
-    return classifyMove({
+    const ply = gameRef.current.history().length;
+    const evaluation = classifyMove({
       beforeFen,
       afterFen: gameRef.current.fen(),
       move,
       moveNumber: Math.ceil(gameRef.current.history().length / 2),
       playerColor: move.color === "w" ? "white" : "black",
     });
+    return { ...evaluation, ply };
+  }
+
+  function trimEvaluationsToCurrentHistory() {
+    const remainingPlyCount = gameRef.current.history().length;
+    const nextEvaluations = moveEvaluationsRef.current.filter((evaluation) => {
+      if (!evaluation?.ply) return true;
+      return evaluation.ply <= remainingPlyCount;
+    });
+    moveEvaluationsRef.current = nextEvaluations;
+    setMoveEvaluations(nextEvaluations);
+  }
+
+  function getEvaluationForPly(ply) {
+    return moveEvaluations.find((evaluation) => evaluation.ply === ply) ?? null;
+  }
+
+  function describeMove(move, prefix = "Move") {
+    return `${prefix}: ${move.san}`;
   }
 
   function resetGame({ broadcast = true, nextTimeControl = timeControl } = {}) {
@@ -280,19 +306,20 @@ export default function Play() {
         setMessage("Illegal move. Try another square.");
         return false;
       }
-      const evaluation = evaluateMadeMove(beforeFen, move);
-      appendMoveEvaluation(evaluation);
+      const evaluation = shouldEvaluateMove(move) ? evaluateMadeMove(beforeFen, move) : null;
+      if (evaluation) appendMoveEvaluation(evaluation);
       setSelectedSquare(null);
       setLegalTargets([]);
-      setLastMove({ from: move.from, to: move.to });
+      setLastMove({ from: move.from, to: move.to, ply: gameRef.current.history().length });
       setClockStarted(true);
-      const { nextHistory, nextStatus } = syncGame(`${evaluation.label}: ${evaluation.explanation}`);
+      const { nextHistory, nextStatus } = syncGame(
+        evaluation ? `${evaluation.label}: ${evaluation.explanation}` : describeMove(move, "Move played")
+      );
       if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
       sendOnlineEvent("move", {
         moveInput: { from: move.from, to: move.to, promotion: move.promotion || "q" },
-        evaluation,
         fen: gameRef.current.fen(),
-        lastMove: { from: move.from, to: move.to },
+        lastMove: { from: move.from, to: move.to, ply: gameRef.current.history().length },
         clocks,
         timeControl,
       });
@@ -335,9 +362,7 @@ export default function Play() {
     if (mode === "ai" && gameRef.current.history().length) {
       gameRef.current.undo();
     }
-    const undoCount = mode === "ai" ? 2 : 1;
-    moveEvaluationsRef.current = moveEvaluationsRef.current.slice(0, Math.max(0, moveEvaluationsRef.current.length - undoCount));
-    setMoveEvaluations(moveEvaluationsRef.current);
+    trimEvaluationsToCurrentHistory();
     savedRef.current = false;
     setReview(null);
     setGameReport(null);
@@ -436,11 +461,13 @@ export default function Play() {
       if (aiMove) {
         const beforeFen = gameRef.current.fen();
         const move = gameRef.current.move({ from: aiMove.from, to: aiMove.to, promotion: aiMove.promotion || "q" });
-        const evaluation = evaluateMadeMove(beforeFen, move);
-        appendMoveEvaluation(evaluation);
-        setLastMove({ from: move.from, to: move.to });
+        const evaluation = shouldEvaluateMove(move) ? evaluateMadeMove(beforeFen, move) : null;
+        if (evaluation) appendMoveEvaluation(evaluation);
+        setLastMove({ from: move.from, to: move.to, ply: gameRef.current.history().length });
         setClockStarted(true);
-        const { nextHistory, nextStatus } = syncGame(`AI move: ${evaluation.label}. ${evaluation.explanation}`);
+        const { nextHistory, nextStatus } = syncGame(
+          evaluation ? `AI move: ${evaluation.label}. ${evaluation.explanation}` : describeMove(move, "AI played")
+        );
         if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
       }
       aiPendingRef.current = false;
@@ -483,17 +510,13 @@ export default function Play() {
       .on("broadcast", { event: "move" }, ({ payload }) => {
         if (payload?.senderId === clientIdRef.current) return;
         try {
-          let evaluation = payload.evaluation;
           if (payload.moveInput) {
-            const beforeFen = gameRef.current.fen();
             const move = gameRef.current.move(payload.moveInput);
-            evaluation = evaluation || evaluateMadeMove(beforeFen, move);
-            setLastMove({ from: move.from, to: move.to });
+            setLastMove({ from: move.from, to: move.to, ply: gameRef.current.history().length });
           } else {
             gameRef.current.load(payload.fen);
             setLastMove(payload.lastMove ?? null);
           }
-          if (evaluation) appendMoveEvaluation(evaluation);
           if (payload.clocks) setClocks(payload.clocks);
           if (payload.timeControl) setTimeControl(payload.timeControl);
           setClockStarted(true);
@@ -579,7 +602,7 @@ export default function Play() {
   const squareStyles = useMemo(() => {
     const styles = {};
     if (lastMove) {
-      const latestEvaluation = moveEvaluations[moveEvaluations.length - 1];
+      const latestEvaluation = lastMove.ply ? getEvaluationForPly(lastMove.ply) : null;
       const moveColor =
         latestEvaluation?.colorCode === "red"
           ? "var(--move-red-soft)"

@@ -20,7 +20,7 @@ export function generateGameReport({
 } = {}) {
   const userEvaluations = moveEvaluations.filter((evaluation) => evaluation.color === userColor);
   const quality = summarizeMoveQuality(moveEvaluations, userColor);
-  const accuracy = calculateAccuracy(moveEvaluations, userColor);
+  const accuracy = userEvaluations.length ? calculateAccuracy(moveEvaluations, userColor) : (review?.accuracy ?? 100);
   const bestMove = pickBestMove(userEvaluations);
   const worstMove = pickWorstMove(userEvaluations);
   const mainWeakness = chooseMainWeakness({ review, userEvaluations });

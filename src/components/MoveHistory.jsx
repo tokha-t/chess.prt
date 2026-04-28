@@ -6,13 +6,22 @@ export default function MoveHistory({ moves, evaluations = [], playerColor = nul
   const [selectedEvaluation, setSelectedEvaluation] = useState(null);
   const [filter, setFilter] = useState("all");
   const pairs = formatMoveHistory(moves);
+  const evaluationByPly = useMemo(() => {
+    return new Map(evaluations.map((evaluation, index) => [evaluation.ply ?? index + 1, evaluation]));
+  }, [evaluations]);
   const filteredPairs = useMemo(() => {
-    if (filter === "all") return pairs;
+    const pairsWithEvaluations = pairs.map((pair) => ({
+      ...pair,
+      whiteEvaluation: evaluationByPly.get((pair.number - 1) * 2 + 1),
+      blackEvaluation: evaluationByPly.get((pair.number - 1) * 2 + 2),
+    }));
+
+    if (filter === "all") return pairsWithEvaluations;
     return pairs
-      .map((pair, pairIndex) => ({
+      .map((pair) => ({
         ...pair,
-        whiteEvaluation: evaluations[pairIndex * 2],
-        blackEvaluation: evaluations[pairIndex * 2 + 1],
+        whiteEvaluation: evaluationByPly.get((pair.number - 1) * 2 + 1),
+        blackEvaluation: evaluationByPly.get((pair.number - 1) * 2 + 2),
       }))
       .filter((pair) => {
         const rowEvaluations = [pair.whiteEvaluation, pair.blackEvaluation].filter(Boolean);
@@ -21,7 +30,7 @@ export default function MoveHistory({ moves, evaluations = [], playerColor = nul
           (evaluation) => evaluation.classification === "mistake" || evaluation.classification === "blunder"
         );
       });
-  }, [evaluations, filter, pairs, playerColor]);
+  }, [evaluationByPly, filter, pairs, playerColor]);
 
   return (
     <section className="panel move-history">
@@ -60,12 +69,12 @@ export default function MoveHistory({ moves, evaluations = [], playerColor = nul
               <span className="move-number">{pair.number}.</span>
               <MoveCell
                 move={pair.white}
-                evaluation={pair.whiteEvaluation ?? evaluations[(pair.number - 1) * 2]}
+                evaluation={pair.whiteEvaluation}
                 onSelect={setSelectedEvaluation}
               />
               <MoveCell
                 move={pair.black}
-                evaluation={pair.blackEvaluation ?? evaluations[(pair.number - 1) * 2 + 1]}
+                evaluation={pair.blackEvaluation}
                 onSelect={setSelectedEvaluation}
               />
             </li>

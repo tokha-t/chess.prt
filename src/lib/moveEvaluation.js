@@ -122,15 +122,17 @@ export function evaluateMoveSequence(history = []) {
     const beforeFen = game.fen();
     const madeMove = game.move({ from: move.from, to: move.to, promotion: move.promotion || "q" });
     if (!madeMove) continue;
-    evaluations.push(
-      classifyMove({
+    const ply = game.history().length;
+    evaluations.push({
+      ...classifyMove({
         beforeFen,
         afterFen: game.fen(),
         move: madeMove,
         moveNumber: Math.ceil(game.history().length / 2),
         playerColor: madeMove.color === "w" ? "white" : "black",
-      })
-    );
+      }),
+      ply,
+    });
   }
 
   return evaluations;
