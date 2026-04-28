@@ -1,0 +1,16 @@
+{
+  "name": "ChessMentor AI",
+  "short_name": "ChessMentor",
+  "description": "A beginner-friendly chess learning platform with AI play, saved history, progress tracking, and post-game coaching.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f0e7",
+  "theme_color": "#1f6f64",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

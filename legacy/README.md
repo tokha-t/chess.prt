@@ -1,0 +1,1 @@
+/* legacy files copied from static ChessPulse */

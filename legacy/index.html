@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChessPulse</title>
+    <meta name="theme-color" content="#0f141f" />
+    <meta
+      name="description"
+      content="ChessPulse — современная веб-платформа для шахмат с AI Coach, историей партий, городским лидербордом и красивым адаптивным интерфейсом."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css?v=2" />
+  </head>
+  <body data-theme="aurora">
+    <main class="page-shell">
+      <header class="app-topbar reveal">
+        <div class="brand-lockup">
+          <span class="brand-mark">♞</span>
+          <div>
+            <p class="eyebrow">CHESSPULSE</p>
+            <h1>AI chess studio</h1>
+          </div>
+        </div>
+
+        <div class="topbar-status">
+          <strong>Play · Review · Climb</strong>
+          <span>AI Coach, history, city ladder</span>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="button button--primary" id="new-game-btn">Новая партия</button>
+          <button class="button button--ghost" id="share-btn">Поделиться вызовом</button>
+        </div>
+
+        <div class="topbar-metrics" id="hero-metrics"></div>
+      </header>
+
+      <section class="dashboard-grid">
+        <aside class="panel profile-panel reveal">
+          <div class="panel-header">
+            <div>
+              <p class="panel-label">Player Profile</p>
+              <h2>Твой игровой пульт</h2>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <label class="field">
+              <span>Имя игрока</span>
+              <input id="profile-name" type="text" maxlength="24" placeholder="Например, Toktarkhan" />
+            </label>
+
+            <label class="field">
+              <span>Город</span>
+              <input id="profile-city" type="text" maxlength="24" placeholder="Almaty" />
+            </label>
+
+            <label class="field">
+              <span>Режим</span>
+              <select id="mode-select">
+                <option value="ai">Против ИИ</option>
+                <option value="local">Локально вдвоем</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Уровень ИИ</span>
+              <select id="ai-select">
+                <option value="spark">Spark</option>
+                <option value="studio">Studio</option>
+                <option value="apex">Apex</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Играть за</span>
+              <select id="side-select">
+                <option value="w">Белых</option>
+                <option value="b">Черных</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Контроль времени</span>
+              <select id="time-control-select">
+                <option value="rapid">10+5 rapid</option>
+                <option value="blitz">5+0 blitz</option>
+                <option value="classic">15+10 classic</option>
+                <option value="untimed">Без часов</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Тема интерфейса</span>
+              <select id="theme-select">
+                <option value="aurora">Aurora</option>
+                <option value="ember">Ember</option>
+                <option value="onyx">Onyx</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Тема доски</span>
+              <select id="board-theme-select">
+                <option value="sand">Sand</option>
+                <option value="cobalt">Cobalt</option>
+                <option value="sage">Sage</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="toggle-row">
+            <input id="coach-toggle" type="checkbox" />
+            <span>Включить AI Coach после каждого твоего хода</span>
+          </label>
+
+          <div class="mini-stats" id="profile-stats"></div>
+
+          <div class="card-stack">
+            <article class="mini-card">
+              <div class="mini-card__top">
+                <p class="panel-label">City Ladder</p>
+                <span class="badge badge--soft" id="city-rank-badge">#1</span>
+              </div>
+              <ul class="leaderboard-list" id="leaderboard-list"></ul>
+            </article>
+
+            <article class="mini-card pro-card">
+              <div class="mini-card__top">
+                <p class="panel-label">Monetization Layer</p>
+                <span class="badge badge--accent">Upgrade to Pro</span>
+              </div>
+              <h3>Премиум-слой уже ощущается продуктом</h3>
+              <p>
+                Открытие глубокого анализа, тренировка дебютов и кастомные скины
+                фигур вынесены как премиальная надстройка.
+              </p>
+              <button class="button button--secondary" type="button">Посмотреть Pro-фичи</button>
+            </article>
+          </div>
+        </aside>
+
+        <section class="panel board-panel reveal">
+          <div class="panel-header board-panel__header">
+            <div>
+              <p class="panel-label">Arena</p>
+              <h2 id="status-title">Матч готов к старту</h2>
+            </div>
+
+            <div class="inline-actions">
+              <button class="button button--ghost" id="flip-btn" type="button">Перевернуть</button>
+              <button class="button button--ghost" id="hint-btn" type="button">Подсказка</button>
+              <button class="button button--ghost" id="undo-btn" type="button">Отменить</button>
+              <button class="button button--ghost" id="reset-btn" type="button">Сбросить</button>
+            </div>
+          </div>
+
+          <div class="board-layout">
+            <div class="board-stack">
+              <div class="status-strip">
+                <div>
+                  <span class="status-dot" id="status-dot"></span>
+                  <span id="status-subtitle">Выбери фигуру, чтобы увидеть доступные ходы.</span>
+                </div>
+                <span class="badge" id="match-badge">Opening</span>
+              </div>
+
+              <div class="clock-row" aria-label="Игровые часы">
+                <article class="clock-card" id="clock-white-card">
+                  <span>White</span>
+                  <strong id="clock-white">10:00</strong>
+                </article>
+                <article class="clock-card" id="clock-black-card">
+                  <span>Black</span>
+                  <strong id="clock-black">10:00</strong>
+                </article>
+              </div>
+
+              <div class="board-shell">
+                <div id="board" class="board" aria-label="Шахматная доска"></div>
+              </div>
+            </div>
+
+            <aside class="move-column">
+              <article class="mini-card">
+                <div class="mini-card__top">
+                  <p class="panel-label">Momentum</p>
+                  <span class="badge badge--soft" id="momentum-badge">0.0</span>
+                </div>
+                <p class="move-column__copy" id="momentum-copy">
+                  Сильные ходы повышают точность и рейтинг в городском ладдере.
+                </p>
+              </article>
+
+              <article class="mini-card review-card">
+                <div class="mini-card__top">
+                  <p class="panel-label">Review Lab</p>
+                  <span class="badge badge--soft" id="eval-badge">+0.0</span>
+                </div>
+                <div class="review-grid">
+                  <div>
+                    <span>Дебют</span>
+                    <strong id="opening-name">Start position</strong>
+                  </div>
+                  <div>
+                    <span>Материал</span>
+                    <strong id="material-balance">0.0</strong>
+                  </div>
+                  <div>
+                    <span>Форсинг</span>
+                    <strong id="threat-meter">0 ideas</strong>
+                  </div>
+                  <div>
+                    <span>Clock pressure</span>
+                    <strong id="clock-pressure">Low</strong>
+                  </div>
+                </div>
+                <div class="tool-row">
+                  <button class="button button--secondary" id="copy-fen-btn" type="button">Copy FEN</button>
+                  <button class="button button--secondary" id="copy-pgn-btn" type="button">Copy PGN</button>
+                </div>
+              </article>
+
+              <article class="mini-card">
+                <div class="mini-card__top">
+                  <p class="panel-label">Move Tape</p>
+                  <span class="badge badge--soft" id="move-count-badge">0 half-moves</span>
+                </div>
+                <ol class="move-list" id="move-list"></ol>
+              </article>
+            </aside>
+          </div>
+        </section>
+
+        <aside class="panel insight-panel reveal">
+          <div class="tabs">
+            <button class="tab tab--active" type="button" data-tab-target="coach">Coach</button>
+            <button class="tab" type="button" data-tab-target="history">History</button>
+            <button class="tab" type="button" data-tab-target="vision">Vision</button>
+          </div>
+
+          <section class="tab-panel tab-panel--active" id="coach-tab">
+            <article class="coach-hero">
+              <div>
+                <p class="panel-label">AI Coach</p>
+                <h2 id="coach-grade">Жду твой первый ход</h2>
+              </div>
+              <span class="badge badge--accent" id="coach-delta">0.0 eval loss</span>
+            </article>
+
+            <article class="coach-card">
+              <h3>Разбор последнего решения</h3>
+              <p id="coach-summary">
+                После каждого твоего хода я сравниваю его с лучшей доступной идеей и
+                объясняю, где ты выиграл темп, а где отпустил инициативу.
+              </p>
+            </article>
+
+            <article class="coach-card">
+              <h3>Лучшее продолжение</h3>
+              <p id="coach-best-line">Пока что рекомендаций нет — сначала сделай ход.</p>
+            </article>
+
+            <article class="coach-card">
+              <h3>Coach Feed</h3>
+              <ul class="feed-list" id="coach-feed"></ul>
+            </article>
+          </section>
+
+          <section class="tab-panel" id="history-tab">
+            <article class="coach-card">
+              <h3>История партий</h3>
+              <p id="history-summary">
+                Сыграй первую партию — и здесь появится журнал матчей, точность и
+                ключевые ошибки.
+              </p>
+            </article>
+
+            <div class="history-list" id="history-list"></div>
+          </section>
+
+          <section class="tab-panel" id="vision-tab">
+            <article class="coach-card">
+              <h3>Почему это выглядит как продукт, а не как демо</h3>
+              <ul class="vision-list">
+                <li>Retention: история игр, локальный профиль и ежедневный прогресс.</li>
+                <li>Coaching: мгновенная обратная связь по качеству ходов.</li>
+                <li>Social hook: лидерборд по городам вместо безликой таблицы.</li>
+                <li>Monetization: Pro-слой встроен в UX, а не добавлен в README задним числом.</li>
+                <li>Shareability: позицию можно отправить по ссылке как chess challenge.</li>
+              </ul>
+            </article>
+
+            <article class="coach-card">
+              <h3>Что можно показать на интервью</h3>
+              <ul class="vision-list">
+                <li>Как ты выбрал нишу и удержание, а не только “сделал доску”.</li>
+                <li>Как AI Coach усиливает ценность продукта без тяжелого backend.</li>
+                <li>Как интерфейс уже намекает на SaaS/consumer monetization.</li>
+              </ul>
+            </article>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

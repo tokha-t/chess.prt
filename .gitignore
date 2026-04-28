@@ -1,5 +1,9 @@
 .DS_Store
 .netlify/
+node_modules/
+dist/
+.env
+.env.local
 submission/
 chesspulse-*.png
 *-check.png

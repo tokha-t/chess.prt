@@ -1,148 +1,114 @@
-# ChessPulse
+# ChessMentor AI
 
-**ChessPulse** is a modern chess web app designed as a product prototype, not just a board demo.
+## Short description
+ChessMentor AI is a web-based chess learning platform for beginners and students. It allows users to play chess, compete against AI, save game history, track progress, and receive simple post-game mistake analysis.
 
-Live demo: [https://chesspulse-great.netlify.app/](https://chesspulse-great.netlify.app/)
+Live demo: https://chesspulse-great.netlify.app/
 
-It combines:
+## Problem
+Most chess platforms show users what the best move is, but beginners often do not understand why their move was wrong. This makes improvement difficult without a coach.
 
-- legal chess gameplay with full move validation
-- a built-in AI opponent
-- an **AI Coach** that evaluates your decisions after each move
-- timed games with `5+0`, `10+5`, `15+10`, and untimed modes
-- drag-and-drop moves, click-to-move, hints, and keyboard shortcuts
-- Review Lab with opening detection, material balance, forcing-move pressure, FEN, and PGN export
-- persistent match history in `localStorage`
-- a city-based leaderboard for a stronger social loop
-- a premium-ready product layer with monetization cues
-- PWA metadata and service worker caching for an installable, offline-friendly feel
-- a responsive interface that works well on desktop and mobile
+## Solution
+ChessMentor AI turns each game into a learning experience by explaining mistakes in simple language, tracking progress, and giving users a clear direction for improvement.
 
-## Product Idea
+## Target users
+- Beginner chess players
+- Students
+- People who want to improve without hiring a coach
+- Casual players who want feedback after games
 
-Most test assignments stop at “a chessboard that works”.
+## Features
+- Full chess rules with `chess.js`
+- Local two-player mode
+- Play against AI
+- AI difficulty levels: Easy, Medium, Hard
+- User authentication with Supabase
+- Saved game history
+- Post-game review
+- Rule-based mistake cards
+- Dashboard with progress
+- City leaderboard
+- Dark/light theme
+- Responsive desktop and mobile design
 
-ChessPulse is framed differently: it is a **retention-focused chess product** for players who want quick matches, instant feedback, and a feeling of progression.
+## Tech stack
+- React
+- Vite dev server
+- `chess.js`
+- `react-chessboard`
+- Supabase Auth and Database
+- CSS modules via plain responsive CSS
+- Netlify-ready SPA build
 
-The app is built around 3 value loops:
+## Database
+The Supabase schema is in `supabase-schema.sql`.
 
-1. **Play loop**: start a game instantly and face an AI opponent.
-2. **Improve loop**: get feedback from AI Coach and understand which moves lost tempo.
-3. **Return loop**: save your history, track accuracy, and climb a city leaderboard.
+Tables:
+- `profiles`: user profile, city, rating, XP, games played, wins, losses, draws
+- `games`: saved PGN/FEN, move history, result, mistakes, accuracy, opponent type
 
-That makes the project feel closer to a startup MVP than a coding exercise.
+Security:
+- Row Level Security is enabled.
+- Users can read, insert, and update their own games.
+- Users can update their own profile.
+- Profile ranking fields are readable for the leaderboard.
 
-## Core Features
+## Business potential
+ChessMentor AI can start as a free learning platform for casual players, then expand into a Pro plan for advanced AI analysis, unlimited reviews, custom board skins, city tournaments, and school chess programs.
 
-- **Full chess rules** via `chess.js`
-- **AI Opponent** with multiple personalities:
-  - `Spark` for fast and aggressive play
-  - `Studio` for balanced training games
-  - `Apex` for colder positional play
-- **AI Coach**
-  - classifies moves
-  - estimates evaluation loss
-  - suggests a better continuation when available
-- **Review Lab**
-  - shows the detected opening line
-  - tracks material balance from the player perspective
-  - surfaces forcing-move pressure
-  - exports FEN and PGN for review
-- **Game clocks**
-  - supports blitz, rapid, classic, and untimed play
-  - flag-fall result is saved into history
-- **Input polish**
-  - click-to-move
-  - drag-and-drop pieces
-  - hotkeys: `N` new game, `U` undo, `F` flip, `H` hint, `C` copy FEN, `P` copy PGN
-- **Persistent profile**
-  - player name
-  - city
-  - preferred side, theme, and board palette
-- **Match history**
-  - result
-  - accuracy
-  - biggest mistakes
-  - move count
-- **City leaderboard**
-  - gives the product a social hook instead of a sterile stats panel
-- **Shareable challenge links**
-  - current board state can be shared through URL params
-- **Premium-ready UX**
-  - “Upgrade to Pro” card
-  - clear room for deeper analysis, opening prep, and cosmetics
+## Future improvements
+- Real-time multiplayer with WebSockets
+- Real Stockfish cloud analysis
+- Puzzle generation from user mistakes
+- School and university tournaments
+- Stripe integration
+- Mobile app
 
-## Why This Stands Out
-
-This project intentionally goes beyond the “medium” level from the assignment:
-
-- it is playable
-- it looks like a polished consumer product
-- it includes coaching and retention mechanics
-- it introduces a monetization layer
-- it tells a clear product story in addition to shipping code
-
-## Stack
-
-- HTML
-- CSS
-- Vanilla JavaScript
-- `chess.js` rule engine (local vendor build for offline local runs, ESM import-compatible for static hosting)
-- custom minimax-based AI with alpha-beta pruning, move ordering, and a transposition cache
-- `localStorage` for persistence
-- service worker + web manifest for PWA readiness
-
-## Run Locally
-
-Because the app is static and self-contained, no Node.js setup is required.
-
-From the project folder:
+## How to run locally
+Install dependencies:
 
 ```bash
-python3 -m http.server 4173
+npm install
 ```
 
-Then open:
+Start the local app:
 
-[`http://localhost:4173`](http://localhost:4173)
+```bash
+npm run dev
+```
 
-## Deploy Fast
+Build for production:
 
-Because this is a static project, the fastest deployment paths are:
+```bash
+npm run build
+```
 
-1. **Netlify Drop**
-   - go to [Netlify Drop](https://app.netlify.com/drop)
-   - drag the project folder
-   - get a public URL in minutes
-2. **GitHub + Vercel**
-   - push the folder to a GitHub repo
-   - import it into Vercel as a static project
-3. **GitHub Pages**
-   - push the repo
-   - serve the root folder as a static site
+The local build writes production files to `dist/`.
 
-For the assignment, Netlify Drop is usually the fastest option if time is tight.
+## Environment variables
+Create `.env` from `.env.example`:
 
-## Files
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-public-anon-key
+```
 
-- [index.html](/Users/lost_home/Documents/wool/index.html)
-- [styles.css](/Users/lost_home/Documents/wool/styles.css)
-- [app.js](/Users/lost_home/Documents/wool/app.js)
-- [vendor/chess.js](/Users/lost_home/Documents/wool/vendor/chess.js)
-- [manifest.webmanifest](/Users/lost_home/Documents/wool/manifest.webmanifest)
-- [sw.js](/Users/lost_home/Documents/wool/sw.js)
+Do not commit real Supabase keys. Without these variables, guest play still works, but authentication and cloud saves are disabled.
 
-## What I Would Build Next
+## Supabase setup
+1. Create a Supabase project.
+2. Open the SQL editor.
+3. Run the contents of `supabase-schema.sql`.
+4. Copy the project URL and anon public key into `.env`.
+5. Restart `npm run dev`.
 
-- real-time multiplayer via WebSockets
-- authentication and cloud sync
-- global leaderboards backed by Supabase
-- deeper post-game analysis with Stockfish
-- paid Pro tier with opening labs and custom piece packs
+## Product flow
+1. Visit `/` to understand the product value.
+2. Go to `/play` to play locally or against AI.
+3. Sign up or log in to save finished games.
+4. Open `/history` to review saved games.
+5. Use `/dashboard` to track progress and skills.
+6. Use `/leaderboard` to compare players by city, XP, or rating.
 
-## Submission Positioning
-
-If you use this for the assignment, the short pitch can be:
-
-> ChessPulse is a modern chess product prototype focused on retention and improvement.  
-> It combines gameplay, AI coaching, persistent progress, social competition by city, and a premium-ready UX layer.
+## Legacy version
+The previous static ChessPulse implementation is preserved in `legacy/` so the project history is not lost.
