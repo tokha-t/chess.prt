@@ -1,208 +1,66 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ChessPulse</title>
-  <meta name="description" content="ChessPulse: AI chess studio with coach feedback, local progress, and city ladder." />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #10151d;
-      --panel: #151c27;
-      --panel-2: #1b2430;
-      --line: rgba(255,255,255,.1);
-      --text: #f4f7fb;
-      --muted: #aeb8c7;
-      --accent: #6ee7b7;
-      --gold: #f4bd65;
-      --red: #fb7185;
-      --light: #f0e6d2;
-      --dark: #b8784d;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: "Space Grotesk", system-ui, sans-serif;
-      color: var(--text);
-      background:
-        linear-gradient(135deg, rgba(110,231,183,.13), transparent 34%),
-        linear-gradient(315deg, rgba(244,189,101,.12), transparent 42%),
-        var(--bg);
-    }
-    button, input, select { font: inherit; }
-    button { cursor: pointer; }
-    .shell { width: min(1440px, calc(100vw - 24px)); margin: 0 auto; padding: 14px 0 32px; }
-    .topbar, .panel, .tile, .coach-card { border: 1px solid var(--line); background: rgba(21,28,39,.84); box-shadow: 0 18px 48px rgba(0,0,0,.25); }
-    .topbar { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(240px, 1fr) auto; gap: 12px; align-items: center; padding: 12px; border-radius: 10px; }
-    .brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
-    .mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(120deg, var(--accent), var(--gold)); color: #081118; font-size: 25px; }
-    .eyebrow { margin: 0 0 5px; color: var(--muted); text-transform: uppercase; font-size: 12px; }
-    h1, h2, h3 { margin: 0; font-family: "Fraunces", Georgia, serif; line-height: 1.05; }
-    h1 { font-size: 24px; }
-    h2 { font-size: 22px; }
-    h3 { font-size: 17px; }
-    .status-note { display: grid; gap: 4px; padding: 10px 12px; border-radius: 8px; background: rgba(255,255,255,.04); }
-    .status-note span, .muted { color: var(--muted); }
-    .actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
-    .btn { border: 1px solid var(--line); border-radius: 999px; padding: 10px 15px; color: var(--text); background: transparent; }
-    .btn.primary { border: 0; color: #081118; background: linear-gradient(120deg, var(--accent), var(--gold)); }
-    .metrics { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-    .tile { border-radius: 8px; padding: 12px; background: var(--panel-2); }
-    .tile strong { display: block; margin-top: 3px; font-size: 20px; }
-    .app { display: grid; grid-template-areas: "profile board coach"; grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(280px, 360px); gap: 14px; margin-top: 14px; }
-    .panel { border-radius: 10px; padding: 16px; min-width: 0; }
-    .profile { grid-area: profile; }
-    .arena { grid-area: board; }
-    .coach { grid-area: coach; }
-    .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
-    .form { display: grid; gap: 12px; }
-    label { display: grid; gap: 7px; color: var(--muted); font-size: 14px; }
-    input, select { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; background: #1a2230; color: var(--text); outline: none; }
-    .stats, .leaderboard, .feed, .history { display: grid; gap: 10px; margin-top: 14px; }
-    .mini { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 11px; border-radius: 8px; background: rgba(255,255,255,.04); }
-    .board-wrap { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.04); }
-    .board { width: 100%; aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); overflow: hidden; border-radius: 8px; }
-    .sq { position: relative; display: grid; place-items: center; min-width: 0; min-height: 0; aspect-ratio: 1; border: 0; padding: 0; line-height: 1; appearance: none; font-size: clamp(24px, 5.6vw, 54px); }
-    .sq.light { background: var(--light); color: #111; }
-    .sq.dark { background: var(--dark); color: #111; }
-    .sq.selected::after, .sq.last::after, .sq.check::after { content: ""; position: absolute; inset: 5px; border-radius: 6px; background: rgba(255,255,255,.26); }
-    .sq.check::after { background: rgba(251,113,133,.34); }
-    .dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,.25); }
-    .piece { position: relative; z-index: 1; filter: drop-shadow(0 5px 7px rgba(0,0,0,.28)); }
-    .coord { position: absolute; left: 5px; top: 4px; z-index: 1; font-size: 11px; font-weight: 700; opacity: .55; }
-    .status-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 12px; border-radius: 8px; background: rgba(255,255,255,.04); margin-bottom: 12px; }
-    .pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 8px; }
-    .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 9px; background: rgba(255,255,255,.08); color: var(--muted); font-size: 12px; }
-    .moves { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    .move-list { max-height: 240px; overflow: auto; display: grid; gap: 8px; }
-    .coach-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
-    .tab.active { color: #081118; background: linear-gradient(120deg, var(--accent), white); }
-    .coach-card { border-radius: 8px; padding: 14px; margin-bottom: 10px; }
-    .coach-card p { margin: 8px 0 0; color: var(--muted); line-height: 1.5; }
-    .hidden { display: none; }
-    @media (max-width: 1120px) {
-      .app { display: flex; flex-direction: column; }
-      .arena { order: 1; } .profile { order: 2; } .coach { order: 3; }
-    }
-    @media (max-width: 720px) {
-      .shell { width: min(100vw - 18px, 1440px); padding-top: 9px; }
-      .topbar { grid-template-columns: 1fr; }
-      .status-note, .metrics { display: none; }
-      .actions { justify-content: flex-start; }
-      .panel { padding: 12px; }
-      .panel-head, .status-row { flex-direction: column; align-items: flex-start; }
-      .moves, .stats { grid-template-columns: 1fr; }
-      .sq { font-size: 34px; }
-    }
-  </style>
-</head>
-<body>
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand"><div class="mark">♞</div><div><p class="eyebrow">ChessPulse</p><h1>AI chess studio</h1></div></div>
-      <div class="status-note"><strong>Play · Review · Climb</strong><span>AI Coach, local progress, city ladder</span></div>
-      <div class="actions"><button class="btn primary" id="newGame">New game</button><button class="btn" id="shareGame">Share challenge</button></div>
-      <section class="metrics" id="metrics"></section>
-    </header>
-
-    <section class="app">
-      <aside class="panel profile">
-        <div class="panel-head"><div><p class="eyebrow">Player profile</p><h2>Control room</h2></div></div>
-        <div class="form">
-          <label>Name<input id="name" maxlength="24"></label>
-          <label>City<input id="city" maxlength="24"></label>
-          <label>Mode<select id="mode"><option value="ai">Versus AI</option><option value="local">Local duel</option></select></label>
-          <label>AI level<select id="level"><option value="spark">Spark</option><option value="studio">Studio</option><option value="apex">Apex</option></select></label>
-          <label>Play as<select id="side"><option value="w">White</option><option value="b">Black</option></select></label>
-        </div>
-        <div class="stats" id="profileStats"></div>
-        <div class="leaderboard" id="leaderboard"></div>
-      </aside>
-
-      <section class="panel arena">
-        <div class="panel-head"><div><p class="eyebrow">Arena</p><h2 id="title">Your move</h2></div><div class="actions"><button class="btn" id="flip">Flip</button><button class="btn" id="undo">Undo</button><button class="btn" id="reset">Reset</button></div></div>
-        <div class="status-row"><span><span class="pulse"></span><span id="subtitle">Choose a piece to see legal moves.</span></span><span class="badge" id="phase">Opening</span></div>
-        <div class="board-wrap"><div class="board" id="board" aria-label="Chess board"></div></div>
-        <div class="moves"><div class="tile"><p class="eyebrow">Momentum</p><strong id="momentum">+0.0</strong><span class="muted" id="momentumCopy">Strong moves improve your city rank.</span></div><div class="tile"><p class="eyebrow">Move tape</p><div class="move-list" id="moves"></div></div></div>
-      </section>
-
-      <aside class="panel coach">
-        <div class="coach-tabs"><button class="btn tab active" data-tab="coachView">Coach</button><button class="btn tab" data-tab="historyView">History</button><button class="btn tab" data-tab="visionView">Vision</button></div>
-        <section id="coachView"><div class="coach-card"><p class="eyebrow">AI Coach</p><h2 id="grade">Waiting for your move</h2><p id="coachText">After your move I compare it with the best candidate and explain the decision in plain language.</p></div><div class="coach-card"><h3>Best continuation</h3><p id="bestLine">No line yet.</p></div><div class="feed" id="feed"></div></section>
-        <section id="historyView" class="hidden"><div class="coach-card"><h3>Game history</h3><p id="historyIntro">Finished games appear here with result and accuracy.</p></div><div class="history" id="history"></div></section>
-        <section id="visionView" class="hidden"><div class="coach-card"><h3>Product angle</h3><p>This prototype is built around retention: quick games, immediate coaching, progress memory, social ranking, and a visible Pro layer.</p></div><div class="coach-card"><h3>Pro layer</h3><p>Future monetization can unlock deeper Stockfish reports, opening labs, city leagues, and custom piece skins.</p></div></section>
-      </aside>
-    </section>
-  </main>
-
-  <script type="module">
-    import { Chess } from 'https://cdn.jsdelivr.net/npm/chess.js@1.4.0/dist/esm/chess.js';
-    const $ = id => document.getElementById(id);
-    const files = ['a','b','c','d','e','f','g','h'];
-    const glyph = { wp:'♙', wn:'♘', wb:'♗', wr:'♖', wq:'♕', wk:'♔', bp:'♟', bn:'♞', bb:'♝', br:'♜', bq:'♛', bk:'♚' };
-    const value = { p:100, n:320, b:330, r:500, q:900, k:0 };
-    const presets = { spark:{depth:1,noise:18}, studio:{depth:2,noise:8}, apex:{depth:2,noise:0} };
-    const center = new Set(['d4','e4','d5','e5']);
-    const state = { game:new Chess(), name:localStorage.cpName||'Player One', city:localStorage.cpCity||'Almaty', mode:localStorage.cpMode||'ai', level:localStorage.cpLevel||'studio', side:localStorage.cpSide||'w', orient:'w', selected:null, legal:[], last:null, thinking:false, coach:null, feed:JSON.parse(localStorage.cpFeed||'[]'), history:JSON.parse(localStorage.cpHistory||'[]') };
-
-    function init(){ bind(); sync(); render(); maybeAI(); }
-    function bind(){
-      $('name').oninput=e=>{state.name=e.target.value||'Player One'; localStorage.cpName=state.name; renderStats();};
-      $('city').oninput=e=>{state.city=e.target.value||'Almaty'; localStorage.cpCity=state.city; renderStats();};
-      $('mode').onchange=e=>{state.mode=e.target.value; localStorage.cpMode=state.mode; render(); maybeAI();};
-      $('level').onchange=e=>{state.level=e.target.value; localStorage.cpLevel=state.level; render();};
-      $('side').onchange=e=>{state.side=e.target.value; state.orient=state.side; localStorage.cpSide=state.side; newGame();};
-      $('newGame').onclick=newGame; $('reset').onclick=newGame; $('flip').onclick=()=>{state.orient=state.orient==='w'?'b':'w'; renderBoard();};
-      $('undo').onclick=undo; $('shareGame').onclick=share;
-      $('board').onclick=e=>{const b=e.target.closest('.sq'); if(b) clickSquare(b.dataset.sq);};
-      document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>showTab(t.dataset.tab));
-    }
-    function sync(){ $('name').value=state.name; $('city').value=state.city; $('mode').value=state.mode; $('level').value=state.level; $('side').value=state.side; }
-    function render(){ renderStatus(); renderBoard(); renderMoves(); renderStats(); renderCoach(); renderHistory(); }
-    function renderStatus(){
-      const hist=state.game.history().length; const over=state.game.isGameOver(); const turn=state.game.turn();
-      $('phase').textContent = hist<12?'Opening':hist<40?'Middlegame':'Endgame';
-      if(state.thinking){ $('title').textContent='AI is thinking'; $('subtitle').textContent='The engine is choosing a reply.'; return; }
-      if(state.game.isCheckmate()){ $('title').textContent='Checkmate'; $('subtitle').textContent=(turn==='w'?'Black':'White')+' wins.'; return; }
-      if(state.game.isDraw()){ $('title').textContent='Draw'; $('subtitle').textContent='The game ended peacefully.'; return; }
-      $('title').textContent = state.mode==='ai' && turn!==state.side ? 'AI to move' : (turn==='w'?'White':'Black')+' to move';
-      $('subtitle').textContent = state.selected ? state.legal.length+' legal move(s) from '+state.selected : 'Choose a piece to see legal moves.';
-      if(over) saveGame();
-    }
-    function renderBoard(){
-      const rows=state.orient==='w'?[0,1,2,3,4,5,6,7]:[7,6,5,4,3,2,1,0], cols=state.orient==='w'?[0,1,2,3,4,5,6,7]:[7,6,5,4,3,2,1,0];
-      const board=state.game.board(); let html=''; const check=state.game.isCheck()?kingSquare(state.game.turn()):null;
-      for(const r of rows){ for(const c of cols){ const p=board[r][c], rank=8-r, sq=files[c]+rank, dark=(c+rank)%2===1; const can=state.legal.find(m=>m.to===sq); const cls=['sq',dark?'dark':'light']; if(state.selected===sq)cls.push('selected'); if(state.last&&(state.last.from===sq||state.last.to===sq))cls.push('last'); if(check===sq)cls.push('check'); html+=`<button class="${cls.join(' ')}" data-sq="${sq}"><span class="coord">${sq}</span>${can&&!p?'<i class="dot"></i>':''}${p?`<span class="piece">${glyph[p.color+p.type]}</span>`:''}</button>`; }}
-      $('board').innerHTML=html;
-    }
-    function renderMoves(){ const h=state.game.history({verbose:true}); $('moves').innerHTML=h.length?h.map((m,i)=>`<div class="mini"><span>${i+1}. ${m.san}</span><span>${m.color==='w'?'White':'Black'}</span></div>`).join(''):'<span class="muted">No moves yet.</span>'; }
-    function renderStats(){ const games=state.history.length, wins=state.history.filter(g=>g.outcome==='win').length, acc=games?Math.round(state.history.reduce((s,g)=>s+g.acc,0)/games):100, rating=1150+wins*28+acc; $('metrics').innerHTML=[['Live rating',rating],['Win rate',games?Math.round(wins/games*100)+'%':'0%'],['Coach accuracy',acc+'%'],['City',state.city]].map(x=>`<div class="tile"><p class="eyebrow">${x[0]}</p><strong>${x[1]}</strong></div>`).join(''); $('profileStats').innerHTML=`<div class="mini"><span>Rating</span><strong>${rating}</strong></div><div class="mini"><span>Games</span><strong>${games}</strong></div>`; const names=['Aruzhan','Madi','Amina',state.name,'Dias'].map((n,i)=>({n,r:rating+60-i*35,me:n===state.name})).sort((a,b)=>b.r-a.r); $('leaderboard').innerHTML='<p class="eyebrow">City ladder</p>'+names.map((x,i)=>`<div class="mini"><span>#${i+1} ${x.me?'You':x.n}</span><strong>${x.r}</strong></div>`).join(''); }
-    function renderCoach(){ const c=state.coach; $('grade').textContent=c?c.grade:'Waiting for your move'; $('coachText').textContent=c?c.text:'After your move I compare it with the best candidate and explain the decision in plain language.'; $('bestLine').textContent=c?c.best:'No line yet.'; $('momentum').textContent=c?(c.score>=0?'+':'')+c.score.toFixed(1):'+0.0'; $('momentumCopy').textContent=c?c.grade+': '+c.short:'Strong moves improve your city rank.'; $('feed').innerHTML=state.feed.length?state.feed.slice(0,5).map(f=>`<div class="coach-card"><strong>${f.move} · ${f.grade}</strong><p>${f.short}</p></div>`).join(''):''; }
-    function renderHistory(){ $('history').innerHTML=state.history.length?state.history.map(g=>`<div class="coach-card"><strong>${g.result}</strong><p>${g.moves} moves · ${g.acc}% accuracy · ${g.date}</p></div>`).join(''):''; }
-    function clickSquare(sq){ if(state.thinking)return; if(state.mode==='ai'&&state.game.turn()!==state.side)return; const piece=state.game.get(sq); const chosen=state.legal.find(m=>m.to===sq); if(chosen){ play(chosen); return; } if(!piece||piece.color!==state.game.turn()){ state.selected=null; state.legal=[]; render(); return; } state.selected=sq; state.legal=dedupe(state.game.moves({square:sq,verbose:true})); render(); }
-    function play(m){ const report=analyze(m,state.game.turn()); const done=state.game.move(simple(m)); if(!done)return; state.last=done; state.selected=null; state.legal=[]; if(report){ report.move=done.san; state.coach=report; state.feed.unshift(report); state.feed=state.feed.slice(0,10); localStorage.cpFeed=JSON.stringify(state.feed); } if(state.game.isGameOver())saveGame(); render(); maybeAI(); }
-    function maybeAI(){ if(state.mode!=='ai'||state.game.isGameOver()||state.game.turn()===state.side)return; state.thinking=true; renderStatus(); setTimeout(()=>{ const m=bestMove(state.game, presets[state.level], aiColor()); state.thinking=false; if(m){ state.last=state.game.move(simple(m)); if(state.game.isGameOver())saveGame(); } render(); },380); }
-    function bestMove(game,preset,persp){ const g=new Chess(game.fen()), moves=dedupe(g.moves({verbose:true})); if(!moves.length)return null; const scored=moves.map(m=>{g.move(simple(m)); const s=minimax(g,preset.depth,-1e9,1e9,persp); g.undo(); return {m,s};}).sort((a,b)=>b.s-a.s); const top=scored.filter(x=>x.s>=scored[0].s-preset.noise); return top[Math.floor(Math.random()*top.length)].m; }
-    function minimax(g,d,a,b,p){ if(d===0||g.isGameOver())return evalPos(g,p); const max=g.turn()===p, moves=dedupe(g.moves({verbose:true})).sort((x,y)=>moveScore(y)-moveScore(x)); if(max){let best=-1e9; for(const m of moves){g.move(simple(m)); best=Math.max(best,minimax(g,d-1,a,b,p)); g.undo(); a=Math.max(a,best); if(b<=a)break;} return best;} let best=1e9; for(const m of moves){g.move(simple(m)); best=Math.min(best,minimax(g,d-1,a,b,p)); g.undo(); b=Math.min(b,best); if(b<=a)break;} return best; }
-    function evalPos(g,p){ if(g.isCheckmate())return g.turn()===p?-99999:99999; if(g.isDraw())return 0; let s=0; for(const row of g.board())for(const q of row)if(q){ const sign=q.color==='w'?1:-1; s+=sign*(value[q.type]+bonus(q)); } return p==='w'?s:-s; }
-    function bonus(p){ let b=center.has(p.square)?22:0; if(p.type==='n'||p.type==='b')b+=8; if(p.type==='k'&&['g1','c1','g8','c8'].includes(p.square))b+=28; return b; }
-    function moveScore(m){ return (m.captured?value[m.captured]:0)+(m.san.includes('+')?35:0)+(center.has(m.to)?20:0)+(m.flags.includes('k')||m.flags.includes('q')?25:0); }
-    function analyze(move,p){ const g=new Chess(state.game.fen()), moves=dedupe(g.moves({verbose:true})); let best=null, chosen=null; for(const m of moves){ g.move(simple(m)); const s=minimax(g,1,-1e9,1e9,p); g.undo(); if(!best||s>best.s)best={m,s}; if(m.from===move.from&&m.to===move.to)chosen=s; } const delta=Math.max(0,(best.s-(chosen??best.s))/100), grade=delta<.2?'Best move':delta<.7?'Strong move':delta<1.6?'Inaccuracy':delta<3?'Mistake':'Blunder'; const short=move.captured?'Material changed hands.':center.has(move.to)?'You fought for the center.':move.san.includes('+')?'You created forcing pressure.':'The position shifted in initiative.'; return {grade,short,score:(chosen??0)/100,text:delta<.2?'Excellent choice. This was the engine preference.':`You gave up around ${delta.toFixed(1)} pawns versus the top candidate.`,best:best&&best.m.san!==move.san?`Try ${best.m.san}: it keeps more pressure.`:'You already found the main idea.'}; }
-    function saveGame(){ const sig=state.game.fen(); if(state.saved===sig)return; state.saved=sig; const winner=state.game.isCheckmate()?(state.game.turn()==='w'?'b':'w'):null; const outcome=!winner?'draw':winner===state.side?'win':'loss'; const avg=state.feed.length?Math.max(45,Math.round(100-state.feed.slice(0,8).filter(x=>x.grade==='Mistake'||x.grade==='Blunder').length*11)):100; state.history.unshift({result:winner?(winner==='w'?'1-0':'0-1'):'1/2-1/2',outcome,moves:state.game.history().length,acc:avg,date:new Date().toLocaleDateString()}); state.history=state.history.slice(0,8); localStorage.cpHistory=JSON.stringify(state.history); }
-    function newGame(){ state.game=new Chess(); state.selected=null; state.legal=[]; state.last=null; state.coach=null; state.saved=null; render(); maybeAI(); }
-    function undo(){ if(!state.game.history().length)return; state.game.undo(); if(state.mode==='ai'&&state.game.history().length&&state.game.turn()!==state.side)state.game.undo(); state.last=state.game.history({verbose:true}).slice(-1)[0]||null; render(); }
-    function share(){ const u=new URL(location.href); u.searchParams.set('fen',state.game.fen()); navigator.clipboard?.writeText(u.href); }
-    function showTab(id){ document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===id)); ['coachView','historyView','visionView'].forEach(x=>$(x).classList.toggle('hidden',x!==id)); }
-    function simple(m){ return {from:m.from,to:m.to,promotion:m.promotion||'q'}; }
-    function dedupe(moves){ const map=new Map(); for(const m of moves){ const k=m.from+m.to; if(!map.has(k)||m.promotion==='q')map.set(k,m); } return [...map.values()]; }
-    function aiColor(){ return state.side==='w'?'b':'w'; }
-    function kingSquare(c){ for(const r of state.game.board())for(const p of r)if(p&&p.type==='k'&&p.color===c)return p.square; return null; }
-    init();
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChessMentor AI</title>
+    <meta
+      name="description"
+      content="ChessMentor AI helps beginners play chess, understand mistakes, save game history, and track progress."
+    />
+    <meta name="theme-color" content="#1f6f64" />
+    <meta http-equiv="refresh" content="0; url=https://69f03a810e780c2d5d622b0d--chesspulse-great.netlify.app/" />
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0e1615;
+        color: #f4fbf8;
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(122, 232, 198, 0.2), transparent 30%),
+          radial-gradient(circle at 80% 0%, rgba(244, 189, 101, 0.18), transparent 28%),
+          #0e1615;
+      }
+      main {
+        width: min(560px, calc(100vw - 40px));
+        padding: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        background: rgba(18, 29, 27, 0.86);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+      }
+      h1 { margin: 0 0 12px; font-size: clamp(32px, 7vw, 56px); line-height: 0.95; }
+      p { color: #b8c9c2; font-size: 18px; line-height: 1.55; }
+      a {
+        display: inline-flex;
+        margin-top: 14px;
+        padding: 12px 16px;
+        border-radius: 999px;
+        color: #071311;
+        background: linear-gradient(135deg, #7ae8c6, #f4bd65);
+        font-weight: 800;
+        text-decoration: none;
+      }
+    </style>
+    <script>
+      const target = new URL("https://69f03a810e780c2d5d622b0d--chesspulse-great.netlify.app");
+      target.pathname = location.pathname;
+      target.search = location.search;
+      target.hash = location.hash;
+      location.replace(target.toString());
+    </script>
+  </head>
+  <body>
+    <main>
+      <h1>ChessMentor AI</h1>
+      <p>Loading the latest stable chess platform with AI opponent, saved progress, game review, and dashboard.</p>
+      <a href="https://69f03a810e780c2d5d622b0d--chesspulse-great.netlify.app/">Open ChessMentor AI</a>
+    </main>
+  </body>
 </html>
