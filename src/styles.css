@@ -504,6 +504,12 @@ h3 {
   background: color-mix(in srgb, var(--danger), transparent 88%);
 }
 
+.notice.success {
+  border-color: color-mix(in srgb, var(--success), transparent 55%);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success), transparent 88%);
+}
+
 .success-line {
   margin: 0.8rem 0 0;
   color: var(--success);
@@ -750,7 +756,10 @@ h3 {
 .auth-page {
   display: grid;
   min-height: calc(100svh - 86px);
-  place-items: center;
+  align-items: start;
+  justify-items: center;
+  padding-top: clamp(1.5rem, 6vh, 4rem);
+  padding-bottom: clamp(2rem, 6vh, 4rem);
 }
 
 .auth-card {
@@ -758,6 +767,16 @@ h3 {
   width: min(480px, 100%);
   gap: 1rem;
   padding: clamp(1.25rem, 5vw, 2rem);
+}
+
+.auth-card h1 {
+  margin-bottom: 0.25rem;
+  font-size: clamp(2rem, 6vw, 3.35rem);
+  line-height: 0.98;
+}
+
+.auth-card .muted {
+  line-height: 1.55;
 }
 
 .stats-grid {

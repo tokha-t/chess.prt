@@ -10,21 +10,29 @@ export default function AuthForm({ mode }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
     try {
       if (isSignup) {
-        await signUp(email, password);
+        const data = await signUp(email, password);
+        if (!data.session) {
+          setSuccess(
+            "Account created. Supabase requires email confirmation, so check your inbox/spam and then log in.",
+          );
+          return;
+        }
       } else {
         await signIn(email, password);
       }
       navigate(location.state?.from || "/dashboard");
     } catch (nextError) {
-      setError(nextError.message);
+      setError(formatAuthError(nextError.message));
     } finally {
       setLoading(false);
     }
@@ -56,6 +64,7 @@ export default function AuthForm({ mode }) {
         />
       </label>
 
+      {success ? <div className="notice success">{success}</div> : null}
       {error ? <div className="notice error">{error}</div> : null}
 
       <button className="button primary full" type="submit" disabled={loading || !configured}>
@@ -71,4 +80,22 @@ export default function AuthForm({ mode }) {
       </Link>
     </form>
   );
+}
+
+function formatAuthError(message = "") {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("email not confirmed")) {
+    return "Email is not confirmed yet. Open the confirmation email from Supabase first, then try logging in again.";
+  }
+
+  if (normalized.includes("security purposes") || normalized.includes("rate")) {
+    return "Supabase is rate-limiting confirmation requests. Wait a few seconds, then try again or check the previous email.";
+  }
+
+  if (normalized.includes("invalid login credentials")) {
+    return "Invalid email or password. If you just signed up, confirm your email before logging in.";
+  }
+
+  return message;
 }
