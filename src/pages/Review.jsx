@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ChessBoard from "../components/ChessBoard.jsx";
+import GameReportCard from "../components/GameReportCard.jsx";
 import GameReview from "../components/GameReview.jsx";
 import MoveHistory from "../components/MoveHistory.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { updateMissionProgress } from "../lib/dailyMissions.js";
 import { getGameById } from "../lib/database.js";
+import { normalizeStoredReport } from "../lib/gameReport.js";
 
 export default function Review() {
   const { id } = useParams();
@@ -17,7 +20,10 @@ export default function Review() {
     let mounted = true;
     getGameById(id, user.id)
       .then((nextGame) => {
-        if (mounted) setGame(nextGame);
+        if (mounted) {
+          setGame(nextGame);
+          updateMissionProgress(user.id, "complete_review").catch(() => {});
+        }
       })
       .catch((nextError) => setError(nextError.message))
       .finally(() => setLoading(false));
@@ -48,6 +54,8 @@ export default function Review() {
     practiceArea: game.mistakes?.[0]?.type ?? "Tactical awareness",
     summary: `${game.result} against ${game.opponent_type}. Accuracy estimate: ${game.accuracy ?? "-"}%.`,
   };
+  const report = normalizeStoredReport(game);
+  const evaluations = game.move_evaluations ?? [];
 
   return (
     <main className="page review-page">
@@ -62,8 +70,9 @@ export default function Review() {
           <ChessBoard fen={game.final_fen} orientation={game.user_color || "white"} squareStyles={{}} disabled />
         </div>
         <aside className="side-column">
-          <GameReview review={review} />
-          <MoveHistory moves={game.move_history ?? []} />
+          <GameReportCard report={report} />
+          <GameReview review={review} moveEvaluations={evaluations} playerColor={game.user_color} />
+          <MoveHistory moves={game.move_history ?? []} evaluations={evaluations} playerColor={game.user_color} />
           <Link className="button primary full" to="/play">
             Play Again
           </Link>

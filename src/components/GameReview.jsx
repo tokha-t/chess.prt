@@ -1,6 +1,7 @@
 import MistakeCard from "./MistakeCard.jsx";
+import MoveQualitySummary from "./MoveQualitySummary.jsx";
 
-export default function GameReview({ review, onPlayAgain }) {
+export default function GameReview({ review, moveEvaluations = [], playerColor = null, onPlayAgain }) {
   if (!review) {
     return (
       <section className="panel review-panel">
@@ -21,6 +22,7 @@ export default function GameReview({ review, onPlayAgain }) {
         <strong className="accuracy">{review.accuracy}%</strong>
       </div>
       <p className="muted">{review.summary}</p>
+      <MoveQualitySummary evaluations={moveEvaluations} playerColor={playerColor} />
       <div className="mistake-grid">
         {review.mistakes.map((mistake) => (
           <MistakeCard key={mistake.type} mistake={mistake} />

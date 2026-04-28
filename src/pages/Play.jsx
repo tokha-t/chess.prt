@@ -1,13 +1,18 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import AIThinkingIndicator from "../components/AIThinkingIndicator.jsx";
 import ChessBoard from "../components/ChessBoard.jsx";
+import DailyMissionsCard from "../components/DailyMissionsCard.jsx";
 import GameControls from "../components/GameControls.jsx";
+import GameReportCard from "../components/GameReportCard.jsx";
 import GameReview from "../components/GameReview.jsx";
 import GameStatus from "../components/GameStatus.jsx";
 import MoveHistory from "../components/MoveHistory.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { selectAiMove } from "../lib/aiPlayer.js";
+import { ensureTodayMissions, updatePostGameMissions } from "../lib/dailyMissions.js";
 import { analyzeGame } from "../lib/gameAnalysis.js";
+import { generateGameReport } from "../lib/gameReport.js";
+import { classifyMove, summarizeMoveQuality } from "../lib/moveEvaluation.js";
 import {
   capitalize,
   createGame,
@@ -16,7 +21,7 @@ import {
   getUserResult,
   serializeMove,
 } from "../lib/chessEngine.js";
-import { saveGame, updateUserStats } from "../lib/database.js";
+import { createGameReport, saveGame, updateUserStats } from "../lib/database.js";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient.js";
 
 const TIME_CONTROLS = {
@@ -46,6 +51,7 @@ export default function Play() {
   const channelRef = useRef(null);
   const clientIdRef = useRef(createRoomId());
   const lastClockTickRef = useRef(Date.now());
+  const moveEvaluationsRef = useRef([]);
   const savedRef = useRef(false);
   const timeoutHandledRef = useRef(false);
 
@@ -65,8 +71,13 @@ export default function Play() {
   const [selectedSquare, setSelectedSquare] = useState(null);
   const [legalTargets, setLegalTargets] = useState([]);
   const [lastMove, setLastMove] = useState(null);
+  const [moveEvaluations, setMoveEvaluations] = useState([]);
   const [review, setReview] = useState(null);
+  const [gameReport, setGameReport] = useState(null);
   const [savedGame, setSavedGame] = useState(null);
+  const [dailyMissions, setDailyMissions] = useState([]);
+  const [missionsLoading, setMissionsLoading] = useState(false);
+  const [missionsError, setMissionsError] = useState("");
 
   const orientation = mode === "ai" || mode === "online" ? playerColor : "white";
   const activeClockColor = gameRef.current.turn() === "w" ? "white" : "black";
@@ -99,6 +110,38 @@ export default function Play() {
     });
   }
 
+  async function refreshMissions() {
+    if (!user) return;
+    setMissionsLoading(true);
+    try {
+      const missions = await ensureTodayMissions(user.id);
+      setDailyMissions(missions);
+      setMissionsError("");
+    } catch (error) {
+      setMissionsError(error.message);
+    } finally {
+      setMissionsLoading(false);
+    }
+  }
+
+  function appendMoveEvaluation(evaluation) {
+    if (!evaluation) return;
+    const nextEvaluations = [...moveEvaluationsRef.current, evaluation];
+    moveEvaluationsRef.current = nextEvaluations;
+    setMoveEvaluations(nextEvaluations);
+    setMessage(`${evaluation.label}: ${evaluation.explanation}`);
+  }
+
+  function evaluateMadeMove(beforeFen, move) {
+    return classifyMove({
+      beforeFen,
+      afterFen: gameRef.current.fen(),
+      move,
+      moveNumber: Math.ceil(gameRef.current.history().length / 2),
+      playerColor: move.color === "w" ? "white" : "black",
+    });
+  }
+
   function resetGame({ broadcast = true, nextTimeControl = timeControl } = {}) {
     gameRef.current = createGame();
     savedRef.current = false;
@@ -106,7 +149,10 @@ export default function Play() {
     setSelectedSquare(null);
     setLegalTargets([]);
     setLastMove(null);
+    moveEvaluationsRef.current = [];
+    setMoveEvaluations([]);
     setReview(null);
+    setGameReport(null);
     setSavedGame(null);
     setClocks(getInitialClocks(nextTimeControl));
     setClockStarted(false);
@@ -130,8 +176,24 @@ export default function Play() {
 
     const userColor = mode === "ai" || mode === "online" ? playerColor : "white";
     const result = getUserResult(nextStatus, userColor, resignedColor);
-    const nextReview = analyzeGame({ history: nextHistory, status: nextStatus, playerColor: userColor });
+    const nextEvaluations = moveEvaluationsRef.current;
+    const nextReview = analyzeGame({
+      history: nextHistory,
+      status: nextStatus,
+      playerColor: userColor,
+      moveEvaluations: nextEvaluations,
+    });
+    const report = generateGameReport({
+      username: user?.email?.split("@")[0] || "Guest player",
+      result,
+      opponentType: mode === "ai" ? `ai_${difficulty}_${timeControl}` : `${mode}_${timeControl}`,
+      userColor,
+      history: nextHistory,
+      moveEvaluations: nextEvaluations,
+      review: nextReview,
+    });
     setReview({ ...nextReview, result });
+    setGameReport(report);
 
     if (!user) {
       setMessage("Game finished. Log in to save and review it later.");
@@ -147,16 +209,44 @@ export default function Play() {
       pgn: gameRef.current.pgn(),
       move_history: nextHistory,
       mistakes: nextReview.mistakes,
-      accuracy: nextReview.accuracy,
+      accuracy: report.accuracy,
+      report,
+      move_evaluations: nextEvaluations,
+      good_moves_count: report.goodMovesCount,
+      bad_moves_count: report.badMovesCount,
+      xp_earned: report.xpEarned,
+      share_id: report.shareId,
     })
-      .then((game) => {
+      .then(async (game) => {
         setSavedGame(game);
-        setMessage("Game saved successfully.");
-        return updateUserStats(user.id, result);
+        await createGameReport({ ...report, game_id: game.id, user_id: user.id });
+        await updateUserStats(user.id, result, report.xpEarned);
+        await updatePostGameMissions(user.id, getPostGameMissionSignals({ result, report, history: nextHistory }));
+        await refreshMissions();
+        setMessage(`Game saved successfully. Game XP: +${report.xpEarned}.`);
       })
       .catch((error) => {
         setMessage(error.message);
       });
+  }
+
+  function getPostGameMissionSignals({ result, report, history }) {
+    const userColor = mode === "ai" || mode === "online" ? playerColor : "white";
+    const player = userColor === "white" ? "w" : "b";
+    const quality = summarizeMoveQuality(moveEvaluationsRef.current, userColor);
+    const castledEarly = history.some((move, index) => {
+      const moveNumber = Math.floor(index / 2) + 1;
+      return move.color === player && (move.san === "O-O" || move.san === "O-O-O") && moveNumber <= 10;
+    });
+    const queenSafe = !history.some((move) => move.color !== player && move.captured === "q");
+    return {
+      result,
+      accuracy: report.accuracy,
+      goodMovesCount: quality.goodMoves,
+      castledEarly,
+      queenSafe,
+      playedHardAi: mode === "ai" && difficulty === "hard",
+    };
   }
 
   function finishByTimeout(loserColor, remote = false) {
@@ -184,18 +274,23 @@ export default function Play() {
     if (status.isGameOver || thinking || !isHumanTurn()) return false;
 
     try {
+      const beforeFen = gameRef.current.fen();
       const move = gameRef.current.move({ from, to, promotion: "q" });
       if (!move) {
         setMessage("Illegal move. Try another square.");
         return false;
       }
+      const evaluation = evaluateMadeMove(beforeFen, move);
+      appendMoveEvaluation(evaluation);
       setSelectedSquare(null);
       setLegalTargets([]);
       setLastMove({ from: move.from, to: move.to });
       setClockStarted(true);
-      const { nextHistory, nextStatus } = syncGame("");
+      const { nextHistory, nextStatus } = syncGame(`${evaluation.label}: ${evaluation.explanation}`);
       if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
       sendOnlineEvent("move", {
+        moveInput: { from: move.from, to: move.to, promotion: move.promotion || "q" },
+        evaluation,
         fen: gameRef.current.fen(),
         lastMove: { from: move.from, to: move.to },
         clocks,
@@ -240,8 +335,12 @@ export default function Play() {
     if (mode === "ai" && gameRef.current.history().length) {
       gameRef.current.undo();
     }
+    const undoCount = mode === "ai" ? 2 : 1;
+    moveEvaluationsRef.current = moveEvaluationsRef.current.slice(0, Math.max(0, moveEvaluationsRef.current.length - undoCount));
+    setMoveEvaluations(moveEvaluationsRef.current);
     savedRef.current = false;
     setReview(null);
+    setGameReport(null);
     setSavedGame(null);
     setLastMove(null);
     setSelectedSquare(null);
@@ -290,6 +389,33 @@ export default function Play() {
   }
 
   useEffect(() => {
+    let mounted = true;
+    if (!user) {
+      setDailyMissions([]);
+      return undefined;
+    }
+
+    setMissionsLoading(true);
+    ensureTodayMissions(user.id)
+      .then((missions) => {
+        if (mounted) {
+          setDailyMissions(missions);
+          setMissionsError("");
+        }
+      })
+      .catch((error) => {
+        if (mounted) setMissionsError(error.message);
+      })
+      .finally(() => {
+        if (mounted) setMissionsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (mode !== "ai" || status.isGameOver || aiPendingRef.current) return undefined;
     const turnColor = gameRef.current.turn() === "w" ? "white" : "black";
     if (turnColor === playerColor) return undefined;
@@ -308,10 +434,13 @@ export default function Play() {
 
       const aiMove = selectAiMove(gameRef.current, difficulty);
       if (aiMove) {
+        const beforeFen = gameRef.current.fen();
         const move = gameRef.current.move({ from: aiMove.from, to: aiMove.to, promotion: aiMove.promotion || "q" });
+        const evaluation = evaluateMadeMove(beforeFen, move);
+        appendMoveEvaluation(evaluation);
         setLastMove({ from: move.from, to: move.to });
         setClockStarted(true);
-        const { nextHistory, nextStatus } = syncGame("");
+        const { nextHistory, nextStatus } = syncGame(`AI move: ${evaluation.label}. ${evaluation.explanation}`);
         if (nextStatus.isGameOver) finishGame(nextStatus, nextHistory);
       }
       aiPendingRef.current = false;
@@ -354,8 +483,17 @@ export default function Play() {
       .on("broadcast", { event: "move" }, ({ payload }) => {
         if (payload?.senderId === clientIdRef.current) return;
         try {
-          gameRef.current.load(payload.fen);
-          setLastMove(payload.lastMove ?? null);
+          let evaluation = payload.evaluation;
+          if (payload.moveInput) {
+            const beforeFen = gameRef.current.fen();
+            const move = gameRef.current.move(payload.moveInput);
+            evaluation = evaluation || evaluateMadeMove(beforeFen, move);
+            setLastMove({ from: move.from, to: move.to });
+          } else {
+            gameRef.current.load(payload.fen);
+            setLastMove(payload.lastMove ?? null);
+          }
+          if (evaluation) appendMoveEvaluation(evaluation);
           if (payload.clocks) setClocks(payload.clocks);
           if (payload.timeControl) setTimeControl(payload.timeControl);
           setClockStarted(true);
@@ -377,7 +515,10 @@ export default function Play() {
         setSelectedSquare(null);
         setLegalTargets([]);
         setLastMove(null);
+        moveEvaluationsRef.current = [];
+        setMoveEvaluations([]);
         setReview(null);
+        setGameReport(null);
         setSavedGame(null);
         syncGame("Opponent started a new WebSocket room game.");
       })
@@ -438,8 +579,15 @@ export default function Play() {
   const squareStyles = useMemo(() => {
     const styles = {};
     if (lastMove) {
-      styles[lastMove.from] = { background: "var(--last-move)" };
-      styles[lastMove.to] = { background: "var(--last-move)" };
+      const latestEvaluation = moveEvaluations[moveEvaluations.length - 1];
+      const moveColor =
+        latestEvaluation?.colorCode === "red"
+          ? "var(--move-red-soft)"
+          : latestEvaluation?.colorCode === "green"
+            ? "var(--move-green-soft)"
+            : "var(--last-move)";
+      styles[lastMove.from] = { background: moveColor };
+      styles[lastMove.to] = { background: moveColor };
     }
     if (selectedSquare) {
       styles[selectedSquare] = { boxShadow: "inset 0 0 0 4px var(--accent)" };
@@ -460,7 +608,7 @@ export default function Play() {
       }
     }
     return styles;
-  }, [lastMove, legalTargets, selectedSquare, status.isCheck, status.turnColor]);
+  }, [lastMove, legalTargets, moveEvaluations, selectedSquare, status.isCheck, status.turnColor]);
 
   return (
     <main className="page play-page">
@@ -512,8 +660,21 @@ export default function Play() {
             onResign={handleResign}
             disabled={thinking || moves.length === 0}
           />
-          <MoveHistory moves={moves} />
-          <GameReview review={review} onPlayAgain={() => resetGame()} />
+          <MoveHistory moves={moves} evaluations={moveEvaluations} playerColor={orientation} />
+          <DailyMissionsCard
+            missions={dailyMissions}
+            loading={missionsLoading}
+            error={missionsError}
+            onRefresh={refreshMissions}
+            guest={!user}
+          />
+          <GameReportCard report={gameReport} />
+          <GameReview
+            review={review}
+            moveEvaluations={moveEvaluations}
+            playerColor={orientation}
+            onPlayAgain={() => resetGame()}
+          />
         </aside>
       </section>
     </main>

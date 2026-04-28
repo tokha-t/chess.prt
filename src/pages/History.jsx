@@ -51,6 +51,7 @@ export default function History() {
             <span>{game.opponent_type}</span>
             <span>{game.move_history?.length ?? 0} plies</span>
             <span>{game.accuracy ?? "-"}% accuracy</span>
+            <span>+{game.xp_earned ?? game.report?.xpEarned ?? 0} XP</span>
             <em>View Review</em>
           </Link>
         ))}

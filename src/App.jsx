@@ -9,6 +9,7 @@ import Leaderboard from "./pages/Leaderboard.jsx";
 import Login from "./pages/Login.jsx";
 import Play from "./pages/Play.jsx";
 import Review from "./pages/Review.jsx";
+import ShareReport from "./pages/ShareReport.jsx";
 import Signup from "./pages/Signup.jsx";
 
 function AuthGate({ children }) {
@@ -83,6 +84,7 @@ export default function App() {
             }
           />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/share/:shareId" element={<ShareReport />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

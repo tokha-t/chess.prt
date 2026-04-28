@@ -11,7 +11,7 @@ const DEMO_LEADERS = [
 export async function saveGame(gameData) {
   if (!supabase) throw new Error("Supabase is not configured, so guest games are not saved permanently.");
 
-  const payload = {
+  const basePayload = {
     user_id: gameData.user_id,
     opponent_type: gameData.opponent_type,
     user_color: gameData.user_color,
@@ -22,8 +22,22 @@ export async function saveGame(gameData) {
     mistakes: gameData.mistakes,
     accuracy: gameData.accuracy,
   };
+  const payload = {
+    ...basePayload,
+    report: gameData.report ?? null,
+    move_evaluations: gameData.move_evaluations ?? [],
+    good_moves_count: gameData.good_moves_count ?? 0,
+    bad_moves_count: gameData.bad_moves_count ?? 0,
+    xp_earned: gameData.xp_earned ?? 0,
+    share_id: gameData.share_id ?? null,
+  };
 
-  const { data, error } = await supabase.from("games").insert(payload).select("*").single();
+  let { data, error } = await supabase.from("games").insert(payload).select("*").single();
+  if (error && isMissingColumnError(error)) {
+    const fallback = await supabase.from("games").insert(basePayload).select("*").single();
+    data = fallback.data;
+    error = fallback.error;
+  }
   if (error) throw error;
   return data;
 }
@@ -72,23 +86,65 @@ export async function updateProfile(userId, profileData) {
   return data;
 }
 
-export async function updateUserStats(userId, result) {
+export async function updateUserStats(userId, result, xpEarned = null) {
   if (!supabase || !userId || result === "unfinished") return null;
 
   const profile = (await getProfile(userId)) || {};
   const isWin = result === "win";
   const isDraw = result === "draw";
   const isLoss = result === "loss" || result === "resigned";
+  const xpIncrement = typeof xpEarned === "number" ? xpEarned : isWin ? 30 : isDraw ? 12 : 6;
   const nextProfile = {
     games_played: (profile.games_played ?? 0) + 1,
     wins: (profile.wins ?? 0) + (isWin ? 1 : 0),
     losses: (profile.losses ?? 0) + (isLoss ? 1 : 0),
     draws: (profile.draws ?? 0) + (isDraw ? 1 : 0),
-    xp: (profile.xp ?? 0) + (isWin ? 30 : isDraw ? 12 : 6),
+    xp: (profile.xp ?? 0) + xpIncrement,
     rating: Math.max(100, (profile.rating ?? 800) + (isWin ? 18 : isDraw ? 2 : -12)),
   };
 
   return updateProfile(userId, nextProfile);
+}
+
+export async function createGameReport(reportData) {
+  if (!supabase || !reportData?.game_id || !reportData?.user_id) return null;
+
+  const payload = {
+    game_id: reportData.game_id,
+    user_id: reportData.user_id,
+    username: reportData.username,
+    result: reportData.result,
+    opponent_type: reportData.opponentType,
+    user_color: reportData.userColor,
+    accuracy: reportData.accuracy,
+    total_moves: reportData.totalMoves,
+    good_moves_count: reportData.goodMovesCount,
+    bad_moves_count: reportData.badMovesCount,
+    best_move: reportData.bestMove,
+    worst_move: reportData.worstMove,
+    main_weakness: reportData.mainWeakness,
+    coach_tip: reportData.coachTip,
+    xp_earned: reportData.xpEarned,
+    share_id: reportData.shareId,
+    report: reportData,
+  };
+
+  const { data, error } = await supabase.from("game_reports").insert(payload).select("*").single();
+  if (error) return null;
+  return data;
+}
+
+export async function getGameReportByShareId(shareId) {
+  if (!supabase || !shareId) return null;
+  const { data, error } = await supabase
+    .from("game_reports")
+    .select(
+      "username,result,opponent_type,user_color,accuracy,total_moves,good_moves_count,bad_moves_count,best_move,worst_move,main_weakness,coach_tip,xp_earned,share_id,report,created_at"
+    )
+    .eq("share_id", shareId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
 export async function getLeaderboard({ city = "All", sort = "rating" } = {}) {
@@ -112,4 +168,9 @@ export async function getLeaderboard({ city = "All", sort = "rating" } = {}) {
 function filterDemoLeaders(city, sort) {
   const rows = city && city !== "All" ? DEMO_LEADERS.filter((row) => row.city === city) : DEMO_LEADERS;
   return [...rows].sort((a, b) => b[sort] - a[sort]);
+}
+
+function isMissingColumnError(error) {
+  const message = `${error?.message ?? ""} ${error?.details ?? ""}`;
+  return message.includes("column") && message.includes("does not exist");
 }

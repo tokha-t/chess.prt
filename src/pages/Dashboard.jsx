@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardStats from "../components/DashboardStats.jsx";
+import DailyMissionsCard from "../components/DailyMissionsCard.jsx";
 import SkillProfile from "../components/SkillProfile.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { ensureTodayMissions } from "../lib/dailyMissions.js";
 import { getProfile, getUserGames, updateProfile } from "../lib/database.js";
 import { estimateSkillProfile } from "../lib/gameAnalysis.js";
 
@@ -10,20 +12,33 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [games, setGames] = useState([]);
+  const [missions, setMissions] = useState([]);
+  const [missionsError, setMissionsError] = useState("");
   const [form, setForm] = useState({ username: "", city: "Other" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([getProfile(user.id, user.email), getUserGames(user.id)])
-      .then(([nextProfile, nextGames]) => {
+    Promise.all([
+      getProfile(user.id, user.email),
+      getUserGames(user.id),
+      ensureTodayMissions(user.id).catch((missionError) => {
+        setMissionsError(missionError.message);
+        return [];
+      }),
+    ])
+      .then(([nextProfile, nextGames, nextMissions]) => {
         if (!mounted) return;
         setProfile(nextProfile);
         setGames(nextGames);
+        setMissions(nextMissions);
         setForm({ username: nextProfile?.username || "", city: nextProfile?.city || "Other" });
       })
-      .catch((nextError) => setError(nextError.message))
+      .catch((nextError) => {
+        setError(nextError.message);
+        setMissionsError(nextError.message);
+      })
       .finally(() => setLoading(false));
     return () => {
       mounted = false;
@@ -46,6 +61,16 @@ export default function Dashboard() {
   const skills = estimateSkillProfile(games);
   const recentGames = games.slice(0, 5);
 
+  async function handleMissionRefresh() {
+    try {
+      const nextMissions = await ensureTodayMissions(user.id);
+      setMissions(nextMissions);
+      setMissionsError("");
+    } catch (nextError) {
+      setMissionsError(nextError.message);
+    }
+  }
+
   return (
     <main className="page dashboard-page">
       <section className="page-heading">
@@ -57,6 +82,14 @@ export default function Dashboard() {
       {error ? <div className="notice error">{error}</div> : null}
 
       <DashboardStats profile={profile} games={games} />
+
+      <DailyMissionsCard
+        missions={missions}
+        loading={loading}
+        error={missionsError}
+        onRefresh={handleMissionRefresh}
+        guest={false}
+      />
 
       <section className="dashboard-layout">
         <SkillProfile skills={skills} />
@@ -96,8 +129,8 @@ export default function Dashboard() {
       <section className="panel">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Recent games</p>
-            <h2>Latest reviews</h2>
+            <p className="eyebrow">Recent game reports</p>
+            <h2>Latest reports</h2>
           </div>
           <Link className="button small" to="/history">
             View all
@@ -110,6 +143,8 @@ export default function Dashboard() {
                 <strong>{game.result}</strong>
                 <span>{game.opponent_type}</span>
                 <span>{game.accuracy ?? "-"}% accuracy</span>
+                <span>+{game.xp_earned ?? game.report?.xpEarned ?? 0} XP</span>
+                <em>{game.report?.mainWeakness ?? "View report"}</em>
               </Link>
             ))}
           </div>

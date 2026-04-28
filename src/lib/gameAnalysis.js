@@ -1,3 +1,5 @@
+import { calculateAccuracy } from "./moveEvaluation.js";
+
 const PIECE_VALUES = {
   p: 1,
   n: 3,
@@ -7,7 +9,7 @@ const PIECE_VALUES = {
   k: 0,
 };
 
-export function analyzeGame({ history = [], status, playerColor = "white" }) {
+export function analyzeGame({ history = [], status, playerColor = "white", moveEvaluations = [] }) {
   const player = playerColor === "white" ? "w" : "b";
   const mistakes = [];
   const playerMoves = history.filter((move) => move.color === player);
@@ -76,7 +78,9 @@ export function analyzeGame({ history = [], status, playerColor = "white" }) {
   }
 
   const topMistakes = mistakes.slice(0, 3);
-  const accuracy = clamp(100 - topMistakes.reduce((sum, mistake) => sum + mistake.severity, 0), 0, 100);
+  const accuracy = moveEvaluations.length
+    ? calculateAccuracy(moveEvaluations, playerColor)
+    : clamp(100 - topMistakes.reduce((sum, mistake) => sum + mistake.severity, 0), 0, 100);
   const practiceArea = pickPracticeArea(topMistakes);
 
   return {
